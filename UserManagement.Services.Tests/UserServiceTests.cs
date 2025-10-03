@@ -1,8 +1,10 @@
+using System;
 using System.Linq;
+using UserManagement.Data;
 using UserManagement.Models;
 using UserManagement.Services.Domain.Implementations;
 
-namespace UserManagement.Data.Tests;
+namespace UserManagement.Services.Tests;
 
 public class UserServiceTests
 {
@@ -11,8 +13,8 @@ public class UserServiceTests
     {
         // Arrange
         var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true };
-        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", IsActive = false };
+        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
+        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false };
         SetupUsers(activeUser, inactiveUser);
 
         // Act
@@ -28,8 +30,8 @@ public class UserServiceTests
     {
         // Arrange
         var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true };
-        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", IsActive = false };
+        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
+        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false };
         SetupUsers(activeUser, inactiveUser);
 
         // Act
@@ -45,7 +47,7 @@ public class UserServiceTests
     {
         // Arrange
         var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true };
+        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
         SetupUsers(activeUser);
 
         // Act
@@ -76,9 +78,9 @@ public class UserServiceTests
         return usersQueryable;
     }
 
-    private IQueryable<User> SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", bool isActive = true)
+    private IQueryable<User> SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", DateOnly dateOfBirth = default, bool isActive = true)
     {
-        return SetupUsers(new User { Forename = forename, Surname = surname, Email = email, IsActive = isActive });
+        return SetupUsers(new User { Forename = forename, Surname = surname, Email = email, DateOfBirth = dateOfBirth, IsActive = isActive });
     }
 
     private readonly Mock<IDataContext> _dataContext = new();

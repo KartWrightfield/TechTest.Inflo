@@ -1,5 +1,5 @@
+using System;
 using System.Linq;
-using FluentAssertions;
 using UserManagement.Models;
 
 namespace UserManagement.Data.Tests;
@@ -16,7 +16,8 @@ public class DataContextTests
         {
             Forename = "Brand New",
             Surname = "User",
-            Email = "brandnewuser@example.com"
+            Email = "brandnewuser@example.com",
+            DateOfBirth = new DateOnly(1959, 1, 25)
         };
         context.Create(entity);
 
@@ -24,7 +25,7 @@ public class DataContextTests
         var result = context.GetAll<User>();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
-        result
+        result.AsEnumerable()
             .Should().Contain(s => s.Email == entity.Email)
             .Which.Should().BeEquivalentTo(entity);
     }
@@ -41,7 +42,7 @@ public class DataContextTests
         var result = context.GetAll<User>();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
-        result.Should().NotContain(s => s.Email == entity.Email);
+        result.AsEnumerable().Should().NotContain(s => s.Email == entity.Email);
     }
 
     private DataContext CreateContext() => new();

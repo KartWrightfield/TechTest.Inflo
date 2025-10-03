@@ -1,3 +1,4 @@
+using System;
 using UserManagement.Models;
 using UserManagement.Services.Domain.Interfaces;
 using UserManagement.Web.Controllers;
@@ -14,8 +15,8 @@ public class UserControllerTests
         var controller = CreateController();
         var activeUsers = new[]
         {
-            new User { Forename = "Active", Surname = "User1", Email = "active1@example.com", IsActive = true },
-            new User { Forename = "Active", Surname = "User2", Email = "active2@example.com", IsActive = true }
+            new User { Forename = "Active", Surname = "User1", Email = "active1@example.com", DateOfBirth = new DateOnly(1954, 6, 1), IsActive = true },
+            new User { Forename = "Active", Surname = "User2", Email = "active2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
         };
 
         _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
@@ -39,8 +40,8 @@ public class UserControllerTests
         var controller = CreateController();
         var inactiveUsers = new[]
         {
-            new User { Forename = "Inactive", Surname = "User1", Email = "inactive1@example.com", IsActive = false },
-            new User { Forename = "Inactive", Surname = "User2", Email = "inactive2@example.com", IsActive = false }
+            new User { Forename = "Inactive", Surname = "User1", Email = "inactive1@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false },
+            new User { Forename = "Inactive", Surname = "User2", Email = "inactive2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false }
         };
 
         _userService.Setup(s => s.FilterByActive(false)).Returns(inactiveUsers);
@@ -103,7 +104,7 @@ public class UserControllerTests
         var controller = CreateController();
         var activeUsers = new[]
         {
-            new User { Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true }
+            new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
         };
 
         _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
@@ -135,7 +136,7 @@ public class UserControllerTests
             .Which.Items.Should().BeEquivalentTo(users);
     }
 
-    private User[] SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", bool isActive = true)
+    private User[] SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", DateOnly dateOfBirth = default, bool isActive = true)
     {
         var users = new[]
         {
@@ -144,6 +145,7 @@ public class UserControllerTests
                 Forename = forename,
                 Surname = surname,
                 Email = email,
+                DateOfBirth = dateOfBirth,
                 IsActive = isActive
             }
         };
