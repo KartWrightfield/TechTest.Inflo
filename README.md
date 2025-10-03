@@ -1,12 +1,12 @@
 # User Management Technical Exercise
 
-The exercise is an ASP.NET Core web application backed by Entity Framework Core, which faciliates management of some fictional users.
+The exercise is an ASP.NET Core web application backed by Entity Framework Core, which facilitates management of some fictional users.
 We recommend that you use [Visual Studio (Community Edition)](https://visualstudio.microsoft.com/downloads) or [Visual Studio Code](https://code.visualstudio.com/Download) to run and modify the application. 
 
 **The application uses an in-memory database, so changes will not be persisted between executions.**
 
 ## The Exercise
-Complete as many of the tasks below as you feel comfortable with. These are split into 4 levels of difficulty 
+Complete as many of the tasks below as you feel comfortable with. These are split into 4 levels of difficulty
 * **Standard** - Functionality that is common when working as a web developer
 * **Advanced** - Slightly more technical tasks and problem solving
 * **Expert** - Tasks with a higher level of problem solving and architecture needed
@@ -27,7 +27,7 @@ Add a new property to the `User` class in the system called `DateOfBirth` which 
 Create the code and UI flows for the following actions
 * **Add** – A screen that allows you to create a new user and return to the list
 * **View** - A screen that displays the information about a user
-* **Edit** – A screen that allows you to edit a selected user from the list  
+* **Edit** – A screen that allows you to edit a selected user from the list
 * **Delete** – A screen that allows you to delete a selected user from the list
 
 Each of these screens should contain appropriate data validation, which is communicated to the end user.
@@ -35,7 +35,7 @@ Each of these screens should contain appropriate data validation, which is commu
 ### 4. Data Logging (Advanced)
 
 Extend the system to capture log information regarding primary actions performed on each user in the app.
-* In the **View** screen there should be a list of all actions that have been performed against that user. 
+* In the **View** screen there should be a list of all actions that have been performed against that user.
 * There should be a new **Logs** page, containing a list of log entries across the application.
 * In the Logs page, the user should be able to click into each entry to see more detail about it.
 * In the Logs page, think about how you can provide a good user experience - even when there are many log entries.
