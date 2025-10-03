@@ -1,12 +1,124 @@
 using UserManagement.Models;
 using UserManagement.Services.Domain.Interfaces;
+using UserManagement.Web.Controllers;
 using UserManagement.Web.Models.Users;
-using UserManagement.WebMS.Controllers;
 
-namespace UserManagement.Data.Tests;
+namespace UserManagement.Web.Tests;
 
 public class UserControllerTests
 {
+    [Fact]
+    public void List_WhenFilterIsActive_ModelMustContainOnlyActiveUsers()
+    {
+        // Arrange
+        var controller = CreateController();
+        var activeUsers = new[]
+        {
+            new User { Forename = "Active", Surname = "User1", Email = "active1@example.com", IsActive = true },
+            new User { Forename = "Active", Surname = "User2", Email = "active2@example.com", IsActive = true }
+        };
+
+        _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
+
+        // Act
+        var result = controller.List("active");
+
+        // Assert
+        result.Model.Should().BeOfType<UserListViewModel>()
+            .Which.Items.Should().HaveCount(2)
+            .And.AllSatisfy(item => item.IsActive.Should().BeTrue());
+
+        _userService.Verify(s => s.FilterByActive(true), Times.Once);
+        _userService.Verify(s => s.GetAll(), Times.Never);
+    }
+
+    [Fact]
+    public void List_WhenFilterIsInactive_ModelMustContainOnlyInactiveUsers()
+    {
+        // Arrange
+        var controller = CreateController();
+        var inactiveUsers = new[]
+        {
+            new User { Forename = "Inactive", Surname = "User1", Email = "inactive1@example.com", IsActive = false },
+            new User { Forename = "Inactive", Surname = "User2", Email = "inactive2@example.com", IsActive = false }
+        };
+
+        _userService.Setup(s => s.FilterByActive(false)).Returns(inactiveUsers);
+
+        // Act
+        var result = controller.List("inactive");
+
+        // Assert
+        result.Model.Should().BeOfType<UserListViewModel>()
+            .Which.Items.Should().HaveCount(2)
+            .And.AllSatisfy(item => item.IsActive.Should().BeFalse());
+
+        _userService.Verify(s => s.FilterByActive(false), Times.Once);
+        _userService.Verify(s => s.GetAll(), Times.Never);
+    }
+
+    [Fact]
+    public void List_WhenFilterIsAll_MustCallGetAllAndReturnAllUsers()
+    {
+        // Arrange
+        var controller = CreateController();
+        var allUsers = SetupUsers();
+
+        // Act
+        var result = controller.List("all");
+
+        // Assert
+        result.Model.Should().BeOfType<UserListViewModel>()
+            .Which.Items.Should().BeEquivalentTo(allUsers);
+
+        _userService.Verify(s => s.GetAll(), Times.Once);
+        _userService.Verify(s => s.FilterByActive(It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public void List_WhenFilterIsUnrecognised_MustDefaultToShowingAllUsers()
+    {
+        // Arrange
+        var controller = CreateController();
+        var allUsers = SetupUsers();
+
+        // Act
+        var result = controller.List("unrecognised-filter");
+
+        // Assert
+        result.Model.Should().BeOfType<UserListViewModel>()
+            .Which.Items.Should().BeEquivalentTo(allUsers);
+
+        _userService.Verify(s => s.GetAll(), Times.Once);
+        _userService.Verify(s => s.FilterByActive(It.IsAny<bool>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("ACTIVE")]
+    [InlineData("Active")]
+    [InlineData("AcTiVe")]
+    public void List_WhenFilterIsCaseVariationsOfActive_MustHandleCaseInsensitivity(string filter)
+    {
+        // Arrange
+        var controller = CreateController();
+        var activeUsers = new[]
+        {
+            new User { Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true }
+        };
+
+        _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
+
+        // Act
+        var result = controller.List(filter);
+
+        // Assert
+        result.Model.Should().BeOfType<UserListViewModel>()
+            .Which.Items.Should().HaveCount(1)
+            .And.AllSatisfy(item => item.IsActive.Should().BeTrue());
+
+        _userService.Verify(s => s.FilterByActive(true), Times.Once);
+    }
+
     [Fact]
     public void List_WhenServiceReturnsUsers_ModelMustContainUsers()
     {
