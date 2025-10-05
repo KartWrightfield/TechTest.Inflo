@@ -62,8 +62,6 @@ public class UserControllerTests
             IsActive = true
         };
 
-        _userService.Setup(s => s.Create(user)).Returns(Task.CompletedTask);
-
         // Act
         var result = await controller.Add(user);
 
@@ -82,7 +80,7 @@ public class UserControllerTests
     {
         // Arrange
         var controller = CreateController();
-        var user = new User { Forename = "John", Surname = "Doe" };
+        var user = new User { Forename = "George", Surname = "Romero" };
         const string exceptionMessage = "Database connection failed";
 
         _userService.Setup(s => s.Create(user)).ThrowsAsync(new Exception(exceptionMessage));
@@ -229,6 +227,49 @@ public class UserControllerTests
             .Which.Items.Should().BeEquivalentTo(users);
     }
 
+    [Fact]
+    public async Task View_WhenServiceReturnsNull_ReturnsToListViewWithErrorMessage()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        _userService.Setup(s => s.GetById(1)).ReturnsAsync((User?)null);
+
+        //Act
+        var result = await  controller.View(1);
+
+        //Assert
+        result.Should().BeOfType<RedirectToActionResult>()
+            .Which.ActionName.Should().Be(nameof(UsersController.List));
+
+        _userService.Verify(s => s.GetById(1), Times.Once);
+
+        controller.TempData.Should().ContainKey("ErrorMessage")
+            .WhoseValue.Should().Be("Unable to find user with ID 1");
+    }
+
+    [Fact]
+    public async Task View_WhenServiceReturnsUser_ReturnsCorrespondingUserViewModel()
+    {
+        //Arrange
+        var controller = CreateController();
+        var users = new[]
+        {
+            new User { Id = 1, Forename = "Test", Surname = "User1", Email = "active1@example.com", DateOfBirth = new DateOnly(1954, 6, 1), IsActive = true },
+            new User { Id = 2, Forename = "Test", Surname = "User2", Email = "active2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
+        };
+
+        _userService.Setup(s => s.GetById(1)).ReturnsAsync(users[0]);
+
+        //Act
+        var result = await controller.View(1);
+
+        //Assert
+        result.Should().BeOfType<ViewResult>()
+            .Which.Model.Should().BeOfType<UserViewModel>()
+            .Which.Should().BeEquivalentTo(users[0]);
+    }
+
     private User[] SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", DateOnly dateOfBirth = default, bool isActive = true)
     {
         var users = new[]
@@ -251,5 +292,13 @@ public class UserControllerTests
     }
 
     private readonly Mock<IUserService> _userService = new();
-    private UsersController CreateController() => new(_userService.Object);
+
+    private UsersController CreateController()
+    {
+        var controller = new UsersController(_userService.Object);
+        controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+            new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+            Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+        return controller;
+    }
 }

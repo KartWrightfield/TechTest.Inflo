@@ -1,0 +1,18 @@
+﻿@model UserManagement.Web.Models.Users.UserViewModel
+
+<h2>User @Model.FullName</h2>
+
+<div class="card">
+    <div class="card-body">
+        <p><strong>Id:</strong> @Model.Id</p>
+        <p><strong>Forename:</strong> @Model.Forename</p>
+        <p><strong>Surname:</strong> @Model.Surname</p>
+        <p><strong>Email:</strong> @Model.Email</p>
+        <p><strong>Date of Birth:</strong> @Model.DateOfBirth?.ToString("d")</p>
+        <p><strong>Is Active:</strong> @(Model.IsActive ? "Yes" : "No")</p>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a asp-controller="Users" asp-action="List" class="btn btn-secondary">Back to List</a>
+</div>

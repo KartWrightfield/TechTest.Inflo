@@ -66,4 +66,28 @@ public class UsersController(IUserService userService) : Controller
 
         return View(model);
     }
+
+    [HttpGet("view")]
+    public async Task<IActionResult> View(int userId)
+    {
+        var user = await userService.GetById(userId);
+
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+            return RedirectToAction(nameof(List));
+        }
+
+        var userViewModel = new UserViewModel
+        {
+            Id = user.Id,
+            Forename = user.Forename,
+            Surname = user.Surname,
+            Email = user.Email,
+            DateOfBirth = user.DateOfBirth,
+            IsActive = user.IsActive
+        };
+
+        return View(userViewModel);
+    }
 }

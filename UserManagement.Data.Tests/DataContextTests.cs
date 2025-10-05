@@ -8,6 +8,29 @@ namespace UserManagement.Data.Tests;
 public class DataContextTests
 {
     [Fact]
+    public async Task Create_ShouldAddNewEntityToSet()
+    {
+        //Arrange
+        var context = CreateContext();
+        var newEntity = new User
+        {
+            Forename = "Duane",
+            Surname = "Jones",
+            Email = "duane.jones@notld.com",
+            DateOfBirth = new DateOnly(1937, 4, 11)
+        };
+
+        //Act
+        await context.Create(newEntity);
+
+        //Assert
+        var userSet = context.GetAll<User>();
+
+        userSet.AsEnumerable().Should().Contain(s => s.Email == newEntity.Email)
+            .Which.Should().BeEquivalentTo(newEntity);
+    }
+
+    [Fact]
     public async Task GetAll_WhenNewEntityAdded_MustIncludeNewEntity()
     {
         // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.
@@ -44,6 +67,41 @@ public class DataContextTests
 
         // Assert: Verifies that the action of the method under test behaves as expected.
         result.AsEnumerable().Should().NotContain(s => s.Email == entity.Email);
+    }
+
+    [Fact]
+    public async Task GetById_WhenEntityExists_ShouldReturnEntity()
+    {
+        //Arrange
+        var context = CreateContext();
+        var entity = new User
+        {
+            Id = -1,
+            Forename = "Duane",
+            Surname = "Jones",
+            Email = "duane.jones@notld.com",
+            DateOfBirth = new DateOnly(1937, 4, 11)
+        };
+        await context.Create(entity);
+
+        //Act
+        var result = await context.GetById<User>(-1);
+
+        //Assert
+        result.Should().BeEquivalentTo(entity);
+    }
+
+    [Fact]
+    public async Task GetById_WhenEntityDoesNotExist_ShouldReturnNull()
+    {
+        //Arrange
+        var context = CreateContext();
+
+        //Act
+        var result = await context.GetById<User>(-1);
+
+        //Assert
+        result.Should().BeNull();
     }
 
     private DataContext CreateContext() => new();

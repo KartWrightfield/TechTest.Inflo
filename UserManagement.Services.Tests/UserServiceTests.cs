@@ -141,6 +141,37 @@ public class UserServiceTests
             .Which.Should().BeEquivalentTo(user);
     }
 
+    [Fact]
+    public async Task GetById_WhenEntityExists_ShouldReturnCorrespondingEntity()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var user = new User { Id = -2, Forename = "Johnny", Surname = "User", Email = "juser@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
+        await SeedUsers(context, user);
+
+        var service = new UserService(context);
+
+        //Act
+        var result = await service.GetById(-2);
+
+        //Assert
+        result.Should().BeEquivalentTo(user);
+    }
+
+    [Fact]
+    public async Task GetById_WhenEntityDoesNotExist_ShouldReturnNull()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var service = new UserService(context);
+
+        //Act
+        var result = await service.GetById(1);
+
+        //Assert
+        result.Should().BeNull();
+    }
+
     private TestDataContext CreateInMemoryContext()
     {
         var options = new DbContextOptionsBuilder<TestDataContext>()
@@ -166,6 +197,11 @@ public class UserServiceTests
 
         public IQueryable<TEntity> GetAll<TEntity>() where TEntity : class
             => base.Set<TEntity>();
+
+        public async Task<TEntity?> GetById<TEntity>(long id) where TEntity : class
+        {
+            return await Set<TEntity>().FindAsync(id);
+        }
 
         public async Task Create<TEntity>(TEntity entity) where TEntity : class
         {

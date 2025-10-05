@@ -21,6 +21,13 @@ public interface IUserService
     Task<IEnumerable<User>> FilterByActive(bool isActive);
 
     /// <summary>
+    /// Retrieves a user by their unique identifier.
+    /// </summary>
+    /// <param name="id">The unique identifier of the user to retrieve.</param>
+    /// <returns>The user object associated with the specified identifier if found, null otherwise.</returns>
+    Task<User?> GetById(long id);
+
+    /// <summary>
     /// Retrieves all users.
     /// </summary>
     /// <returns>A collection of all users.</returns>

@@ -13,6 +13,14 @@ public interface IDataContext
     IQueryable<TEntity> GetAll<TEntity>() where TEntity : class;
 
     /// <summary>
+    /// Get an item by its ID
+    /// </summary>
+    /// <param name="id">The primary key ID of the entity</param>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <returns>The entity if found, null otherwise</returns>
+    Task<TEntity?> GetById<TEntity>(long id) where TEntity : class;
+
+    /// <summary>
     /// Create a new item
     /// </summary>
     /// <typeparam name="TEntity"></typeparam>

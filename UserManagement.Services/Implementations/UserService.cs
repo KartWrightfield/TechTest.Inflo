@@ -19,6 +19,8 @@ public class UserService(IDataContext dataAccess) : IUserService
             .ToListAsync();
     }
 
+    public async Task<User?> GetById(long id) => await dataAccess.GetById<User>(id);
+
     public async Task<IEnumerable<User>> GetAll() =>
         await dataAccess.GetAll<User>().ToListAsync();
 }
