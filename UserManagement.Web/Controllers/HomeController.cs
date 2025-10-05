@@ -1,4 +1,4 @@
-﻿namespace UserManagement.WebMS.Controllers;
+﻿namespace UserManagement.Web.Controllers;
 
 public class HomeController : Controller
 {

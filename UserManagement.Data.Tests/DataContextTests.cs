@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using UserManagement.Models;
+using UserManagement.Data.Entities;
 
 namespace UserManagement.Data.Tests;
 

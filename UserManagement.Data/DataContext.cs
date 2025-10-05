@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using UserManagement.Models;
+using UserManagement.Data.Entities;
 
 namespace UserManagement.Data;
 
@@ -34,7 +34,7 @@ public sealed class DataContext : DbContext, IDataContext
 
     public async Task Create<TEntity>(TEntity entity) where TEntity : class
     {
-        base.Add(entity);
+        Add(entity);
         await SaveChangesAsync();
     }
 
@@ -46,7 +46,7 @@ public sealed class DataContext : DbContext, IDataContext
 
     public async Task Delete<TEntity>(TEntity entity) where TEntity : class
     {
-        base.Remove(entity);
+        Remove(entity);
         await SaveChangesAsync();
     }
 }

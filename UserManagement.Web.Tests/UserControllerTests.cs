@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using UserManagement.Models;
+using Microsoft.AspNetCore.Mvc;
+using UserManagement.Data.Entities;
 using UserManagement.Services.Interfaces;
 using UserManagement.Web.Controllers;
 using UserManagement.Web.Models.Users;
@@ -9,6 +10,97 @@ namespace UserManagement.Web.Tests;
 
 public class UserControllerTests
 {
+    [Fact]
+    public void Add_Get_ReturnsViewWithEmptyUser()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        // Act
+        var result = controller.Add();
+
+        // Assert
+        var viewResult = result.Should().BeOfType<ViewResult>().Subject;
+        viewResult.Model.Should().BeOfType<User>()
+            .Which.Should().NotBeNull();
+
+        // Verify it's a new User with default values
+        viewResult.Model.As<User>().Id.Should().Be(0);
+        viewResult.Model.As<User>().Forename.Should().BeNull();
+        viewResult.Model.As<User>().Surname.Should().BeNull();
+        viewResult.Model.As<User>().Email.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Add_Post_WhenModelStateIsInvalid_ReturnsViewWithSameUser()
+    {
+        // Arrange
+        var controller = CreateController();
+        var user = new User { Forename = "Test", Surname = "User" };
+        controller.ModelState.AddModelError("Email", "Email is required");
+
+        // Act
+        var result = await controller.Add(user);
+
+        // Assert
+        var viewResult = result.Should().BeOfType<ViewResult>().Subject;
+        viewResult.Model.Should().Be(user);
+        _userService.Verify(s => s.Create(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Add_Post_WhenModelStateIsValid_CreatesUserAndRedirectsToList()
+    {
+        // Arrange
+        var controller = CreateController();
+        var user = new User
+        {
+            Forename = "George",
+            Surname = "Romero",
+            Email = "george.a.romero@example.com",
+            DateOfBirth = new DateOnly(1940, 1, 1),
+            IsActive = true
+        };
+
+        _userService.Setup(s => s.Create(user)).Returns(Task.CompletedTask);
+
+        // Act
+        var result = await controller.Add(user);
+
+        // Assert
+        result.Should().BeOfType<RedirectToActionResult>()
+            .Which.ActionName.Should().Be(nameof(UsersController.List));
+
+        _userService.Verify(s => s.Create(user), Times.Once);
+
+        controller.TempData.Should().ContainKey("SuccessMessage")
+            .WhoseValue.Should().Be($"User {user.Forename} {user.Surname} was created successfully");
+    }
+
+    [Fact]
+    public async Task Add_Post_WhenServiceThrowsException_ReturnsViewWithErrorMessage()
+    {
+        // Arrange
+        var controller = CreateController();
+        var user = new User { Forename = "John", Surname = "Doe" };
+        const string exceptionMessage = "Database connection failed";
+
+        _userService.Setup(s => s.Create(user)).ThrowsAsync(new Exception(exceptionMessage));
+
+        // Act
+        var result = await controller.Add(user);
+
+        // Assert
+        var viewResult = result.Should().BeOfType<ViewResult>().Subject;
+        viewResult.Model.Should().Be(user);
+
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState.Keys.Should().Contain(string.Empty);
+        controller.ModelState[string.Empty]
+            ?.Errors.Should().ContainSingle(
+            e => e.ErrorMessage.Contains(exceptionMessage));
+    }
+
     [Fact]
     public async Task List_WhenFilterIsActive_ModelMustContainOnlyActiveUsers()
     {

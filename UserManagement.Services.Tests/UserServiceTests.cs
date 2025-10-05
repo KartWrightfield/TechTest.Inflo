@@ -3,13 +3,39 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using UserManagement.Data;
-using UserManagement.Models;
+using UserManagement.Data.Entities;
 using UserManagement.Services.Implementations;
 
 namespace UserManagement.Services.Tests;
 
 public class UserServiceTests
 {
+    [Fact]
+    public async Task Create_WhenNewUserCreated_UserShouldBePresentInDatabase()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var newUser = new User
+        {
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@gmail.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
+
+        var service = new UserService(context);
+
+        //Act
+        await service.Create(newUser);
+
+        //Assert
+        var users = await service.GetAll();
+
+        users.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(newUser);
+    }
+
     [Fact]
     public async Task FilterByActive_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
     {

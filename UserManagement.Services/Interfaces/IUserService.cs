@@ -1,16 +1,23 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using UserManagement.Models;
+using UserManagement.Data.Entities;
 
 namespace UserManagement.Services.Interfaces;
 
 public interface IUserService
 {
     /// <summary>
-    /// Return users by active state
+    /// Creates a new user.
     /// </summary>
-    /// <param name="isActive"></param>
+    /// <param name="user">The user object to be created.</param>
     /// <returns></returns>
+    Task Create(User user);
+
+    /// <summary>
+    /// Retrieves a collection of users filtered by their active status.
+    /// </summary>
+    /// <param name="isActive">A boolean indicating whether to filter for active users (true) or inactive users (false).</param>
+    /// <returns>A collection of users that match the specified active status.</returns>
     Task<IEnumerable<User>> FilterByActive(bool isActive);
 
     /// <summary>
