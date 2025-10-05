@@ -13,19 +13,37 @@ public class UsersController(IUserService userService) : Controller
     [HttpGet("add")]
     public IActionResult Add()
     {
-        return View(new User());
+        return View(new UserInputViewModel());
     }
 
     [HttpPost("add")]
-    public async Task<IActionResult> Add(User user)
+    public async Task<IActionResult> Add(UserInputViewModel userViewModel)
     {
         if (!ModelState.IsValid)
         {
-            return View(user);
+            return View(userViewModel);
+        }
+
+        if (userViewModel.Forename == null ||
+            userViewModel.Surname == null ||
+            userViewModel.Email == null ||
+            userViewModel.DateOfBirth == null)
+        {
+            ModelState.AddModelError(string.Empty, "All required fields must be provided");
+            return View(userViewModel);
         }
 
         try
         {
+            var user = new User
+            {
+                Forename = userViewModel.Forename,
+                Surname = userViewModel.Surname,
+                Email = userViewModel.Email,
+                DateOfBirth = (DateOnly)userViewModel.DateOfBirth,
+                IsActive = userViewModel.IsActive,
+            };
+
             await userService.Create(user);
 
             TempData["SuccessMessage"] = $"User {user.Forename} {user.Surname} was created successfully";
@@ -35,7 +53,7 @@ public class UsersController(IUserService userService) : Controller
         catch (Exception ex)
         {
             ModelState.AddModelError(string.Empty, $"Failed to create user: {ex.Message}");
-            return View(user);
+            return View(userViewModel);
         }
     }
 

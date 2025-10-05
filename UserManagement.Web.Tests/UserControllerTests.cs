@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using UserManagement.Data.Entities;
@@ -21,14 +22,14 @@ public class UserControllerTests
 
         // Assert
         var viewResult = result.Should().BeOfType<ViewResult>().Subject;
-        viewResult.Model.Should().BeOfType<User>()
+        viewResult.Model.Should().BeOfType<UserInputViewModel>()
             .Which.Should().NotBeNull();
 
         // Verify it's a new User with default values
-        viewResult.Model.As<User>().Id.Should().Be(0);
-        viewResult.Model.As<User>().Forename.Should().BeNull();
-        viewResult.Model.As<User>().Surname.Should().BeNull();
-        viewResult.Model.As<User>().Email.Should().BeNull();
+        viewResult.Model.As<UserInputViewModel>().Id.Should().Be(0);
+        viewResult.Model.As<UserInputViewModel>().Forename.Should().BeNull();
+        viewResult.Model.As<UserInputViewModel>().Surname.Should().BeNull();
+        viewResult.Model.As<UserInputViewModel>().Email.Should().BeNull();
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public class UserControllerTests
     {
         // Arrange
         var controller = CreateController();
-        var user = new User { Forename = "Test", Surname = "User" };
+        var user = new UserInputViewModel { Forename = "Test", Surname = "User" };
         controller.ModelState.AddModelError("Email", "Email is required");
 
         // Act
@@ -53,7 +54,7 @@ public class UserControllerTests
     {
         // Arrange
         var controller = CreateController();
-        var user = new User
+        var user = new UserInputViewModel
         {
             Forename = "George",
             Surname = "Romero",
@@ -69,10 +70,90 @@ public class UserControllerTests
         result.Should().BeOfType<RedirectToActionResult>()
             .Which.ActionName.Should().Be(nameof(UsersController.List));
 
-        _userService.Verify(s => s.Create(user), Times.Once);
+        _userService.Verify(s => s.Create(It.Is<User>(u => u.Email == user.Email)), Times.Once);
 
         controller.TempData.Should().ContainKey("SuccessMessage")
             .WhoseValue.Should().Be($"User {user.Forename} {user.Surname} was created successfully");
+    }
+
+    [Theory]
+    [MemberData(nameof(GetNullPropertyTestCases))]
+    public async Task Add_Post_WhenRequiredPropertyOfModelIsNull_ReturnsViewWithErrorMessage(
+        string testCase, UserInputViewModel model)
+    {
+        // Arrange
+        var controller = CreateController();
+        const string exceptionMessage = "All required fields must be provided";
+
+        // Act
+        var result = await controller.Add(model);
+
+        // Assert
+        var viewResult = result.Should().BeOfType<ViewResult>().Subject;
+        viewResult.Model.Should().BeOfType<UserInputViewModel>()
+            .Which.Should().BeEquivalentTo(model);
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState.Keys.Should().Contain(string.Empty);
+        controller.ModelState[string.Empty]
+            ?.Errors.Should().ContainSingle(
+                e => e.ErrorMessage.Contains(exceptionMessage));
+    }
+
+    private static IEnumerable<object[]> GetNullPropertyTestCases()
+    {
+        var defaultDate = new DateOnly(1960, 1, 1);
+
+        yield return
+        [
+            "Null Forename",
+            new UserInputViewModel
+            {
+                Forename = null,
+                Surname = "User",
+                Email = "test@email.com",
+                DateOfBirth = defaultDate,
+                IsActive = true
+            }
+        ];
+
+        yield return
+        [
+            "Null Surname",
+            new UserInputViewModel
+            {
+                Forename = "Test",
+                Surname = null,
+                Email = "test@email.com",
+                DateOfBirth = defaultDate,
+                IsActive = true
+            }
+        ];
+
+        yield return
+        [
+            "Null Email",
+            new UserInputViewModel
+            {
+                Forename = "Test",
+                Surname = "User",
+                Email = null,
+                DateOfBirth = defaultDate,
+                IsActive = true
+            }
+        ];
+
+        yield return
+        [
+            "Null DateOfBirth",
+            new UserInputViewModel
+            {
+                Forename = "Test",
+                Surname = "User",
+                Email = "test@email.com",
+                DateOfBirth = null,
+                IsActive = true
+            }
+        ];
     }
 
     [Fact]
@@ -80,17 +161,23 @@ public class UserControllerTests
     {
         // Arrange
         var controller = CreateController();
-        var user = new User { Forename = "George", Surname = "Romero" };
+        var user = new User
+        {
+            Forename = "George",
+            Surname = "Romero",
+            Email = "active1@example.com",
+            DateOfBirth = new DateOnly(1940, 1, 1)
+        };
         const string exceptionMessage = "Database connection failed";
 
-        _userService.Setup(s => s.Create(user)).ThrowsAsync(new Exception(exceptionMessage));
+        _userService.Setup(s => s.Create(It.IsAny<User>())).ThrowsAsync(new Exception(exceptionMessage));
 
         // Act
-        var result = await controller.Add(user);
+        var result = await controller.Add(new UserInputViewModel { Forename = "George", Surname = "Romero", Email = "active1@example.com", DateOfBirth = new DateOnly(1940, 1, 1) });
 
         // Assert
         var viewResult = result.Should().BeOfType<ViewResult>().Subject;
-        viewResult.Model.Should().Be(user);
+        viewResult.Model.Should().BeEquivalentTo(user);
 
         controller.ModelState.IsValid.Should().BeFalse();
         controller.ModelState.Keys.Should().Contain(string.Empty);
