@@ -1,6 +1,7 @@
 using System;
+using System.Threading.Tasks;
 using UserManagement.Models;
-using UserManagement.Services.Domain.Interfaces;
+using UserManagement.Services.Interfaces;
 using UserManagement.Web.Controllers;
 using UserManagement.Web.Models.Users;
 
@@ -9,7 +10,7 @@ namespace UserManagement.Web.Tests;
 public class UserControllerTests
 {
     [Fact]
-    public void List_WhenFilterIsActive_ModelMustContainOnlyActiveUsers()
+    public async Task List_WhenFilterIsActive_ModelMustContainOnlyActiveUsers()
     {
         // Arrange
         var controller = CreateController();
@@ -19,10 +20,10 @@ public class UserControllerTests
             new User { Forename = "Active", Surname = "User2", Email = "active2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
         };
 
-        _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
+        _userService.Setup(s => s.FilterByActive(true)).ReturnsAsync(activeUsers);
 
         // Act
-        var result = controller.List("active");
+        var result = await controller.List("active");
 
         // Assert
         result.Model.Should().BeOfType<UserListViewModel>()
@@ -34,7 +35,7 @@ public class UserControllerTests
     }
 
     [Fact]
-    public void List_WhenFilterIsInactive_ModelMustContainOnlyInactiveUsers()
+    public async Task List_WhenFilterIsInactive_ModelMustContainOnlyInactiveUsers()
     {
         // Arrange
         var controller = CreateController();
@@ -44,10 +45,10 @@ public class UserControllerTests
             new User { Forename = "Inactive", Surname = "User2", Email = "inactive2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false }
         };
 
-        _userService.Setup(s => s.FilterByActive(false)).Returns(inactiveUsers);
+        _userService.Setup(s => s.FilterByActive(false)).ReturnsAsync(inactiveUsers);
 
         // Act
-        var result = controller.List("inactive");
+        var result = await controller.List("inactive");
 
         // Assert
         result.Model.Should().BeOfType<UserListViewModel>()
@@ -59,14 +60,14 @@ public class UserControllerTests
     }
 
     [Fact]
-    public void List_WhenFilterIsAll_MustCallGetAllAndReturnAllUsers()
+    public async Task List_WhenFilterIsEmpty_MustCallGetAllAndReturnAllUsers()
     {
         // Arrange
         var controller = CreateController();
         var allUsers = SetupUsers();
 
         // Act
-        var result = controller.List("all");
+        var result = await controller.List();
 
         // Assert
         result.Model.Should().BeOfType<UserListViewModel>()
@@ -77,14 +78,14 @@ public class UserControllerTests
     }
 
     [Fact]
-    public void List_WhenFilterIsUnrecognised_MustDefaultToShowingAllUsers()
+    public async Task List_WhenFilterIsUnrecognised_MustDefaultToShowingAllUsers()
     {
         // Arrange
         var controller = CreateController();
         var allUsers = SetupUsers();
 
         // Act
-        var result = controller.List("unrecognised-filter");
+        var result = await controller.List("unrecognised-filter");
 
         // Assert
         result.Model.Should().BeOfType<UserListViewModel>()
@@ -98,7 +99,7 @@ public class UserControllerTests
     [InlineData("ACTIVE")]
     [InlineData("Active")]
     [InlineData("AcTiVe")]
-    public void List_WhenFilterIsCaseVariationsOfActive_MustHandleCaseInsensitivity(string filter)
+    public async Task List_WhenFilterIsCaseVariationsOfActive_MustHandleCaseInsensitivity(string filter)
     {
         // Arrange
         var controller = CreateController();
@@ -107,10 +108,10 @@ public class UserControllerTests
             new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
         };
 
-        _userService.Setup(s => s.FilterByActive(true)).Returns(activeUsers);
+        _userService.Setup(s => s.FilterByActive(true)).ReturnsAsync(activeUsers);
 
         // Act
-        var result = controller.List(filter);
+        var result = await controller.List(filter);
 
         // Assert
         result.Model.Should().BeOfType<UserListViewModel>()
@@ -121,14 +122,14 @@ public class UserControllerTests
     }
 
     [Fact]
-    public void List_WhenServiceReturnsUsers_ModelMustContainUsers()
+    public async Task List_WhenServiceReturnsUsers_ModelMustContainUsers()
     {
-        // Arrange: Initializes objects and sets the value of the data that is passed to the method under test.
+        // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.
         var controller = CreateController();
         var users = SetupUsers();
 
         // Act: Invokes the method under test with the arranged parameters.
-        var result = controller.List();
+        var result = await controller.List();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
         result.Model
@@ -152,7 +153,7 @@ public class UserControllerTests
 
         _userService
             .Setup(s => s.GetAll())
-            .Returns(users);
+            .ReturnsAsync(users);
 
         return users;
     }

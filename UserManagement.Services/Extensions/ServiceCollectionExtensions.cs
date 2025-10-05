@@ -1,5 +1,5 @@
-﻿using UserManagement.Services.Domain.Implementations;
-using UserManagement.Services.Domain.Interfaces;
+﻿using UserManagement.Services.Implementations;
+using UserManagement.Services.Interfaces;
 
 namespace Microsoft.Extensions.DependencyInjection;
 

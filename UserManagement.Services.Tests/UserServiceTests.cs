@@ -1,88 +1,162 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using UserManagement.Data;
 using UserManagement.Models;
-using UserManagement.Services.Domain.Implementations;
+using UserManagement.Services.Implementations;
 
 namespace UserManagement.Services.Tests;
 
 public class UserServiceTests
 {
     [Fact]
-    public void FilterByActive_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
+    public async Task FilterByActive_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
     {
         // Arrange
-        var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
-        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false };
-        SetupUsers(activeUser, inactiveUser);
+        var context = CreateInMemoryContext();
+        await SeedUsers(context,
+            new User
+            {
+                Forename = "Active",
+                Surname = "User",
+                Email = "active@example.com",
+                DateOfBirth = new DateOnly(1972, 12, 28),
+                IsActive = true
+            },
+            new User
+            {
+                Forename = "Inactive",
+                Surname = "User",
+                Email = "inactive@example.com",
+                DateOfBirth = new DateOnly(1972, 12, 28),
+                IsActive = false
+            });
+        var service = new UserService(context);
 
         // Act
-        var result = service.FilterByActive(true);
+        var result = await service.FilterByActive(true);
 
         // Assert
         result.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(activeUser);
+            .Which.Should().BeEquivalentTo(new { Forename = "Active", IsActive = true });
     }
 
     [Fact]
-    public void FilterByActive_WhenFilteringForInactiveUsers_MustReturnOnlyInactiveUsers()
+    public async Task FilterByActive_WhenFilteringForInactiveUsers_MustReturnOnlyInactiveUsers()
     {
         // Arrange
-        var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
-        var inactiveUser = new User { Forename = "Inactive", Surname = "User", Email = "inactive@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false };
-        SetupUsers(activeUser, inactiveUser);
+        var context = CreateInMemoryContext();
+        await SeedUsers(context,
+            new User
+            {
+                Forename = "Active",
+                Surname = "User",
+                Email = "active@example.com",
+                DateOfBirth = new DateOnly(1972, 12, 28),
+                IsActive = true
+            },
+            new User
+            {
+                Forename = "Inactive",
+                Surname = "User",
+                Email = "inactive@example.com",
+                DateOfBirth = new DateOnly(1972, 12, 28),
+                IsActive = false
+            });
+        var service =  new UserService(context);
 
         // Act
-        var result = service.FilterByActive(false);
+        var result = await service.FilterByActive(false);
 
         // Assert
         result.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(inactiveUser);
+            .Which.Should().BeEquivalentTo(new { Forename = "Inactive", IsActive = false });
     }
 
     [Fact]
-    public void FilterByActive_WhenNoUsersMatchFilter_MustReturnEmptyCollection()
+    public async Task FilterByActive_WhenNoUsersMatchFilter_MustReturnEmptyCollection()
     {
         // Arrange
-        var service = CreateService();
-        var activeUser = new User { Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
-        SetupUsers(activeUser);
+        var context = CreateInMemoryContext();
+        await SeedUsers(context,
+            new User
+            {
+                Forename = "Active",
+                Surname = "User",
+                Email = "active@example.com",
+                DateOfBirth = new DateOnly(1972, 12, 28),
+                IsActive = true
+            });
+        var service = new UserService(context);
 
         // Act
-        var result = service.FilterByActive(false);
+        var result = await service.FilterByActive(false);
 
         // Assert
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public void GetAll_WhenContextReturnsEntities_MustReturnSameEntities()
+    public async Task GetAll_WhenContextReturnsEntities_MustReturnSameEntities()
     {
-        // Arrange: Initializes objects and sets the value of the data that is passed to the method under test.
-        var service = CreateService();
-        var users = SetupUsers();
+        // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.
+        var context = CreateInMemoryContext();
+        var user = new User { Forename = "Johnny", Surname = "User", Email = "juser@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
+        await SeedUsers(context, user);
+
+        var service = new UserService(context);
 
         // Act: Invokes the method under test with the arranged parameters.
-        var result = service.GetAll();
+        var result = await service.GetAll();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
-        result.Should().BeSameAs(users);
+        result.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(user);
     }
 
-    private IQueryable<User> SetupUsers(params User[] users)
+    private TestDataContext CreateInMemoryContext()
     {
-        var usersQueryable = users.AsQueryable();
-        _dataContext.Setup(s => s.GetAll<User>()).Returns(usersQueryable);
-        return usersQueryable;
+        var options = new DbContextOptionsBuilder<TestDataContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        return new TestDataContext(options);
     }
 
-    private IQueryable<User> SetupUsers(string forename = "Johnny", string surname = "User", string email = "juser@example.com", DateOnly dateOfBirth = default, bool isActive = true)
+    private async Task SeedUsers(TestDataContext context, params User[] users)
     {
-        return SetupUsers(new User { Forename = forename, Surname = surname, Email = email, DateOfBirth = dateOfBirth, IsActive = isActive });
+        foreach (var user in users)
+        {
+            await context.Users.AddAsync(user);
+        }
+        await context.SaveChangesAsync();
     }
 
-    private readonly Mock<IDataContext> _dataContext = new();
-    private UserService CreateService() => new(_dataContext.Object);
+    // A simplified version of DataContext for testing
+    public class TestDataContext(DbContextOptions<TestDataContext> options) : DbContext(options), IDataContext
+    {
+        public DbSet<User> Users { get; set; }
+
+        public IQueryable<TEntity> GetAll<TEntity>() where TEntity : class
+            => base.Set<TEntity>();
+
+        public async Task Create<TEntity>(TEntity entity) where TEntity : class
+        {
+            base.Add(entity);
+            await SaveChangesAsync();
+        }
+
+        public new async Task Update<TEntity>(TEntity entity) where TEntity : class
+        {
+            base.Update(entity);
+            await SaveChangesAsync();
+        }
+
+        public async Task Delete<TEntity>(TEntity entity) where TEntity : class
+        {
+            base.Remove(entity);
+            await SaveChangesAsync();
+        }
+    }
 }

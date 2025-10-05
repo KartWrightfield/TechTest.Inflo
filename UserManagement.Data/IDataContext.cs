@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
+using System.Threading.Tasks;
 
 namespace UserManagement.Data;
 
@@ -18,15 +18,21 @@ public interface IDataContext
     /// <typeparam name="TEntity"></typeparam>
     /// <param name="entity"></param>
     /// <returns></returns>
-    void Create<TEntity>(TEntity entity) where TEntity : class;
+    Task Create<TEntity>(TEntity entity) where TEntity : class;
 
     /// <summary>
-    /// Uodate an existing item matching the ID
+    /// Update an existing item matching the ID
     /// </summary>
     /// <typeparam name="TEntity"></typeparam>
     /// <param name="entity"></param>
     /// <returns></returns>
-    void Update<TEntity>(TEntity entity) where TEntity : class;
+    Task Update<TEntity>(TEntity entity) where TEntity : class;
 
-    void Delete<TEntity>(TEntity entity) where TEntity : class;
+    /// <summary>
+    /// Delete an item matching the ID
+    /// </summary>
+    /// <param name="entity"></param>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <returns></returns>
+    Task Delete<TEntity>(TEntity entity) where TEntity : class;
 }

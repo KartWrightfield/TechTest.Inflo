@@ -1,24 +1,22 @@
 ﻿using System.Linq;
+using System.Threading.Tasks;
 using UserManagement.Models;
-using UserManagement.Services.Domain.Interfaces;
+using UserManagement.Services.Interfaces;
 using UserManagement.Web.Models.Users;
 
 namespace UserManagement.Web.Controllers;
 
 [Route("users")]
-public class UsersController : Controller
+public class UsersController(IUserService userService) : Controller
 {
-    private readonly IUserService _userService;
-    public UsersController(IUserService userService) => _userService = userService;
-
     [HttpGet]
-    public ViewResult List(string filter = "all")
+    public async Task<ViewResult> List(string filter = "all")
     {
         IEnumerable<User> users = filter.ToLower() switch
         {
-            "active" => _userService.FilterByActive(true),
-            "inactive" => _userService.FilterByActive(false),
-            _ => _userService.GetAll()
+            "active" => await userService.FilterByActive(true),
+            "inactive" => await userService.FilterByActive(false),
+            _ => await userService.GetAll()
         };
 
         var items = users.Select(p => new UserListItemViewModel

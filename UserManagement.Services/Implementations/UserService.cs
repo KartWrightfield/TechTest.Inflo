@@ -1,26 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using UserManagement.Data;
 using UserManagement.Models;
-using UserManagement.Services.Domain.Interfaces;
+using UserManagement.Services.Interfaces;
 
-namespace UserManagement.Services.Domain.Implementations;
+namespace UserManagement.Services.Implementations;
 
-public class UserService : IUserService
+public class UserService(IDataContext dataAccess) : IUserService
 {
-    private readonly IDataContext _dataAccess;
-    public UserService(IDataContext dataAccess) => _dataAccess = dataAccess;
-
-    /// <summary>
-    /// Return users by active state
-    /// </summary>
-    /// <param name="isActive"></param>
-    /// <returns></returns>
-    public IEnumerable<User> FilterByActive(bool isActive)
+    public async Task<IEnumerable<User>> FilterByActive(bool isActive)
     {
-        return _dataAccess.GetAll<User>().Where(u => u.IsActive == isActive);
+        return await dataAccess.GetAll<User>()
+            .Where(u => u.IsActive == isActive)
+            .ToListAsync();
     }
 
-    public IEnumerable<User> GetAll() => _dataAccess.GetAll<User>();
+    public async Task<IEnumerable<User>> GetAll() =>
+        await dataAccess.GetAll<User>().ToListAsync();
 }
