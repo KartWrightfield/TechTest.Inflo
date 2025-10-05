@@ -14,6 +14,13 @@ public interface IUserService
     Task Create(User user);
 
     /// <summary>
+    /// Deletes a user by their unique identifier.
+    /// </summary>
+    /// <param name="id">The unique identifier of the user to delete.</param>
+    /// <returns></returns>
+    Task DeleteById(long id);
+
+    /// <summary>
     /// Retrieves a collection of users filtered by their active status.
     /// </summary>
     /// <param name="isActive">A boolean indicating whether to filter for active users (true) or inactive users (false).</param>

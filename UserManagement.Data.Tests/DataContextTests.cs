@@ -31,6 +31,21 @@ public class DataContextTests
     }
 
     [Fact]
+    public async Task Delete_ShouldRemoveEntityFromSet()
+    {
+        //Arrange
+        var context = CreateContext();
+        var entity = context.GetAll<User>().First();
+
+        //Act
+        await context.Delete(entity);
+
+        //Assert
+        var userSet = context.GetAll<User>();
+        userSet.AsEnumerable().Should().NotContain(s => s.Email == entity.Email);
+    }
+
+    [Fact]
     public async Task GetAll_WhenNewEntityAdded_MustIncludeNewEntity()
     {
         // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.

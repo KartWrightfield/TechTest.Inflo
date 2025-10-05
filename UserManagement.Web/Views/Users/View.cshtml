@@ -14,11 +14,19 @@
 </div>
 
 <div class="mt-3">
-    <a asp-controller="Users" asp-action="List" class="btn btn-secondary">
-        Back to List
-    </a>
+    <div class="d-grid gap-2 d-md-flex">
+        <a asp-controller="Users" asp-action="Update" asp-route-userId="@Model.Id" class="btn btn-primary">
+            Edit User
+        </a>
 
-    <a asp-controller="Users" asp-action="Update" asp-route-userId="@Model.Id" class="btn btn-primary float-end">
-        Edit User
-    </a>
+        <a asp-controller="Users" asp-action="Delete" asp-route-userId="@Model.Id" class="btn btn-danger">
+            Delete User
+        </a>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex justify-content-end">
+        <a asp-controller="Users" asp-action="List" class="btn btn-secondary">
+            Back to List
+        </a>
+    </div>
 </div>

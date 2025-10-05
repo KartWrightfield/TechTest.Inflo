@@ -57,6 +57,47 @@ public class UsersController(IUserService userService) : Controller
         }
     }
 
+    [HttpGet("delete")]
+    public async Task<IActionResult> Delete(int userId)
+    {
+        var user = await userService.GetById(userId);
+
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+            return RedirectToAction(nameof(List));
+        }
+
+        var userViewModel = new UserViewModel
+        {
+            Id = user.Id,
+            Forename = user.Forename,
+            Surname = user.Surname,
+            Email = user.Email,
+            DateOfBirth = user.DateOfBirth,
+            IsActive = user.IsActive
+        };
+
+        return View(userViewModel);
+    }
+
+    [HttpPost("delete")]
+    public async Task<IActionResult> DeleteConfirmed(int userId)
+    {
+        try
+        {
+            await userService.DeleteById(userId);
+            TempData["SuccessMessage"] = "User deleted successfully";
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError(string.Empty, $"Failed to delete user: {ex.Message}");
+            TempData["ErrorMessage"] = $"Failed to delete user with ID: {userId}";
+        }
+
+        return RedirectToAction(nameof(List));
+    }
+
     [HttpGet]
     public async Task<ViewResult> List(string filter = "all")
     {

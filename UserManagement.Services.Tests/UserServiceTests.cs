@@ -37,6 +37,44 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task DeleteById_WhenUserExists_UserShouldNotBePresentInDataContext()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var userToBeDeleted = new User
+        {
+            Id = -2,
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@gmail.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
+
+        var service = new UserService(context);
+        await service.Create(userToBeDeleted);
+
+        //Act
+        await service.DeleteById(userToBeDeleted.Id);
+
+        //Assert
+        var updatedUser = await service.GetById(userToBeDeleted.Id);
+        updatedUser.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Delete_WhenUserDoesNotExist_ShouldThrowException()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var service = new UserService(context);
+
+        //Act & Assert
+        await service.Invoking(s => s.DeleteById(int.MaxValue))
+            .Should().ThrowAsync<Exception>();
+    }
+
+    [Fact]
     public async Task FilterByActive_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
     {
         // Arrange

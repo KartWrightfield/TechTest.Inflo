@@ -130,6 +130,91 @@ public class UserControllerTests
     }
 
     [Fact]
+    public async Task Delete_Get_WhenUserExists_ShouldReturnViewWithPopulatedViewModel()
+    {
+        //Arrange
+        var controller = CreateController();
+        var users = new[]
+        {
+            new User { Id = 1, Forename = "Test", Surname = "User1", Email = "active1@example.com", DateOfBirth = new DateOnly(1954, 6, 1), IsActive = true },
+            new User { Id = 2, Forename = "Test", Surname = "User2", Email = "active2@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true }
+        };
+
+        _userService.Setup(s => s.GetById(1)).ReturnsAsync(users[0]);
+
+        //Act
+        var result = await controller.Delete(1);
+
+        //Assert
+        result.Should().BeOfType<ViewResult>()
+            .Which.ViewData.Model.Should().BeOfType<UserViewModel>()
+            .Which.Should().BeEquivalentTo(users[0]);
+    }
+
+    [Fact]
+    public async Task Delete_Get_WhenUserDoesNotExist_ReturnsToListViewWthErrorMessage()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        _userService.Setup(s => s.GetById(1)).ReturnsAsync((User?)null);
+
+        //Act
+        var result = await controller.Delete(1);
+
+        //Assert
+        result.Should().BeOfType<RedirectToActionResult>()
+            .Which.ActionName.Should().Be(nameof(UsersController.List));
+
+        _userService.Verify(s => s.GetById(1), Times.Once);
+
+        controller.TempData.Should().ContainKey("ErrorMessage")
+            .WhoseValue.Should().Be("Unable to find user with ID 1");
+    }
+
+    [Fact]
+    public async Task DeleteConfirmed_WhenInputIsValid_DeletesUserAndRedirectsToList()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.DeleteConfirmed(1);
+
+        // Assert
+        result.Should().BeOfType<RedirectToActionResult>()
+            .Which.ActionName.Should().Be(nameof(UsersController.List));
+
+        _userService.Verify(s => s.DeleteById(1), Times.Once);
+
+        controller.TempData.Should().ContainKey("SuccessMessage")
+            .WhoseValue.Should().Be("User deleted successfully");
+    }
+
+    [Fact]
+    public async Task DeleteConfirmed_WhenServiceThrowsException_ReturnsViewWithErrorMessage()
+    {
+        // Arrange
+        var controller = CreateController();
+        const string exceptionMessage = "Database connection failed";
+
+        _userService.Setup(s => s.DeleteById(1)).ThrowsAsync(new Exception(exceptionMessage));
+
+        // Act
+        var result = await controller.DeleteConfirmed(1);
+
+        // Assert
+        result.Should().BeOfType<RedirectToActionResult>()
+            .Which.ActionName.Should().Be(nameof(UsersController.List));
+
+        controller.ModelState.IsValid.Should().BeFalse();
+        controller.ModelState.Keys.Should().Contain(string.Empty);
+        controller.ModelState[string.Empty]
+            ?.Errors.Should().ContainSingle(
+                e => e.ErrorMessage.Contains(exceptionMessage));
+    }
+
+    [Fact]
     public async Task List_WhenFilterIsActive_ModelMustContainOnlyActiveUsers()
     {
         // Arrange
