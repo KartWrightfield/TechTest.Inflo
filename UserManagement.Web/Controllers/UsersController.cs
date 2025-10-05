@@ -17,31 +17,31 @@ public class UsersController(IUserService userService) : Controller
     }
 
     [HttpPost("add")]
-    public async Task<IActionResult> Add(UserInputViewModel userViewModel)
+    public async Task<IActionResult> Add(UserInputViewModel userInputViewModel)
     {
         if (!ModelState.IsValid)
         {
-            return View(userViewModel);
+            return View(userInputViewModel);
         }
 
-        if (userViewModel.Forename == null ||
-            userViewModel.Surname == null ||
-            userViewModel.Email == null ||
-            userViewModel.DateOfBirth == null)
+        if (userInputViewModel.Forename == null ||
+            userInputViewModel.Surname == null ||
+            userInputViewModel.Email == null ||
+            userInputViewModel.DateOfBirth == null)
         {
             ModelState.AddModelError(string.Empty, "All required fields must be provided");
-            return View(userViewModel);
+            return View(userInputViewModel);
         }
 
         try
         {
             var user = new User
             {
-                Forename = userViewModel.Forename,
-                Surname = userViewModel.Surname,
-                Email = userViewModel.Email,
-                DateOfBirth = (DateOnly)userViewModel.DateOfBirth,
-                IsActive = userViewModel.IsActive,
+                Forename = userInputViewModel.Forename,
+                Surname = userInputViewModel.Surname,
+                Email = userInputViewModel.Email,
+                DateOfBirth = (DateOnly)userInputViewModel.DateOfBirth,
+                IsActive = userInputViewModel.IsActive,
             };
 
             await userService.Create(user);
@@ -53,7 +53,7 @@ public class UsersController(IUserService userService) : Controller
         catch (Exception ex)
         {
             ModelState.AddModelError(string.Empty, $"Failed to create user: {ex.Message}");
-            return View(userViewModel);
+            return View(userInputViewModel);
         }
     }
 
@@ -83,6 +83,72 @@ public class UsersController(IUserService userService) : Controller
         };
 
         return View(model);
+    }
+
+    [HttpGet("update")]
+    public async Task<IActionResult> Update(int userId)
+    {
+        var user = await userService.GetById(userId);
+
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+            return RedirectToAction(nameof(List));
+        }
+
+        var userInputViewModel = new UserInputViewModel
+        {
+            Id = user.Id,
+            Forename = user.Forename,
+            Surname = user.Surname,
+            Email = user.Email,
+            DateOfBirth = user.DateOfBirth,
+            IsActive = user.IsActive
+        };
+
+        return View(userInputViewModel);
+    }
+
+    [HttpPost("update")]
+    public async Task<IActionResult> Update(UserInputViewModel userInputViewModel)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(userInputViewModel);
+        }
+
+        if (userInputViewModel.Forename == null ||
+            userInputViewModel.Surname == null ||
+            userInputViewModel.Email == null ||
+            userInputViewModel.DateOfBirth == null)
+        {
+            ModelState.AddModelError(string.Empty, "All required fields must be provided");
+            return View(userInputViewModel);
+        }
+
+        try
+        {
+            var user = new User
+            {
+                Id = userInputViewModel.Id,
+                Forename = userInputViewModel.Forename,
+                Surname = userInputViewModel.Surname,
+                Email = userInputViewModel.Email,
+                DateOfBirth = (DateOnly)userInputViewModel.DateOfBirth,
+                IsActive = userInputViewModel.IsActive,
+            };
+
+            await userService.Update(user);
+
+            TempData["SuccessMessage"] = $"User {user.Forename} {user.Surname} was updated successfully";
+
+            return RedirectToAction(nameof(List));
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError(string.Empty, $"Failed to update user: {ex.Message}");
+            return View(userInputViewModel);
+        }
     }
 
     [HttpGet("view")]

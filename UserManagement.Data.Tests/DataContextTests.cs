@@ -104,5 +104,33 @@ public class DataContextTests
         result.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Update_ShouldUpdateEntity()
+    {
+        //Arrange
+        var context = CreateContext();
+        var newEntity = new User
+        {
+            Id = -2,
+            Forename = "Duane",
+            Surname = "Jones",
+            Email = "duane.jones@notld.com",
+            DateOfBirth = new DateOnly(1937, 4, 11)
+        };
+        await context.Create(newEntity);
+
+        var entityToUpdate = await context.GetById<User>(newEntity.Id);
+        entityToUpdate!.Email = "new.email@notld.com";
+
+        //Act
+        await context.Update(entityToUpdate);
+
+        //Assert
+        var userSet = context.GetAll<User>();
+
+        userSet.AsEnumerable().Should().Contain(s => s.Email == "new.email@notld.com")
+            .Which.Id.Should().Be(newEntity.Id);
+    }
+
     private DataContext CreateContext() => new();
 }

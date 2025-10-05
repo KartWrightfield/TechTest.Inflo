@@ -32,4 +32,11 @@ public interface IUserService
     /// </summary>
     /// <returns>A collection of all users.</returns>
     Task<IEnumerable<User>> GetAll();
+
+    /// <summary>
+    /// Updates the details of an existing user.
+    /// </summary>
+    /// <param name="user">The user object containing updated information.</param>
+    /// <returns></returns>
+    Task Update(User user);
 }

@@ -11,7 +11,7 @@ namespace UserManagement.Services.Tests;
 public class UserServiceTests
 {
     [Fact]
-    public async Task Create_WhenNewUserCreated_UserShouldBePresentInDatabase()
+    public async Task Create_WhenNewUserCreated_UserShouldBePresentInDataContext()
     {
         //Arrange
         var context = CreateInMemoryContext();
@@ -170,6 +170,51 @@ public class UserServiceTests
 
         //Assert
         result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_WhenUserExists_UserShouldBeUpdatedWithNewValues()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var newUser = new User
+        {
+            Id = -2,
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@gmail.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
+
+        var service = new UserService(context);
+        await service.Create(newUser);
+
+        var userToUpdate = await service.GetById(newUser.Id);
+        userToUpdate!.Forename = "Updated";
+        userToUpdate.Surname = "Also";
+        userToUpdate.Email = "updated@email.com";
+        userToUpdate.DateOfBirth = new DateOnly(1972, 12, 28);
+        userToUpdate.IsActive = false;
+
+        //Act
+        await service.Update(userToUpdate);
+
+        //Assert
+        var updatedUser = await service.GetById(newUser.Id);
+        updatedUser.Should().BeEquivalentTo(userToUpdate);
+    }
+
+    [Fact]
+    public async Task Update_WhenUserDoesNotExist_ShouldThrowException()
+    {
+        //Arrange
+        var context = CreateInMemoryContext();
+        var service = new UserService(context);
+
+        //Act & Assert
+        await service.Invoking(s => s.Update(new User { Id = 53, Email = "non.existant@email.com" }))
+            .Should().ThrowAsync<Exception>();
     }
 
     private TestDataContext CreateInMemoryContext()

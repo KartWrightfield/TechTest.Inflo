@@ -23,4 +23,6 @@ public class UserService(IDataContext dataAccess) : IUserService
 
     public async Task<IEnumerable<User>> GetAll() =>
         await dataAccess.GetAll<User>().ToListAsync();
+
+    public async Task Update(User user) => await dataAccess.Update(user);
 }
