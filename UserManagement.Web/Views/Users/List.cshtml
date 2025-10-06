@@ -1,4 +1,4 @@
-﻿@model UserManagement.Web.Models.Users.UserListViewModel
+﻿@model UserManagement.Shared.Models.Users.UserListViewModel
 
 <h2>User List</h2>
 
@@ -78,7 +78,7 @@
         <a asp-controller="Users" asp-action="List" asp-route-filter="inactive" class="btn btn-default">Non Active</a>
     </div>
 
-    <a asp-controller="Users" asp-action="Add" class="btn btn-primary float-end">
+    <a asp-controller="Users" asp-action="Create" class="btn btn-primary float-end">
         Add User
     </a>
 </div>

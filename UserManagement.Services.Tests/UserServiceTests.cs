@@ -1,21 +1,89 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using AutoMapper;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.EntityFrameworkCore;
 using UserManagement.Data;
 using UserManagement.Data.Entities;
 using UserManagement.Services.Implementations;
+using UserManagement.Services.Interfaces;
+using UserManagement.Shared.Filters;
+using UserManagement.Shared.Models.Users;
 
 namespace UserManagement.Services.Tests;
 
 public class UserServiceTests
 {
+    private readonly Mock<IValidator<UserInputViewModel>> _validatorMock;
+    private readonly Mock<IMapper> _mapperMock;
+    private readonly TestDataContext _context;
+    private readonly IUserService _service;
+
+    public UserServiceTests()
+    {
+        _context = CreateInMemoryContext();
+        _validatorMock = new Mock<IValidator<UserInputViewModel>>();
+        _mapperMock = new Mock<IMapper>();
+
+        _validatorMock.Setup(v => v.ValidateAsync(It.IsAny<UserInputViewModel>(), CancellationToken.None))
+            .ReturnsAsync(new ValidationResult());
+
+        _service = new UserService(_context, _validatorMock.Object, _mapperMock.Object);
+    }
+
+    [Fact]
+    public async Task Create_EnsuresCorrectOrderOfOperations()
+    {
+        // Arrange
+        var userViewModel = new UserInputViewModel
+        {
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@example.com",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            IsActive = true
+        };
+
+        var user = new User
+        {
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@example.com",
+            DateOfBirth = new DateOnly(1990, 1, 1),
+            IsActive = true
+        };
+
+        // Using callback to track execution order
+        var operationSequence = new List<string>();
+
+        _validatorMock.Setup(v => v.ValidateAsync(userViewModel, CancellationToken.None))
+            .Callback(() => operationSequence.Add("Validation"))
+            .ReturnsAsync(new ValidationResult());
+
+        _mapperMock.Setup(m => m.Map<User>(userViewModel))
+            .Callback(() => operationSequence.Add("Mapping"))
+            .Returns(user);
+
+        // Act
+        await _service.Create(userViewModel);
+
+        // Assert
+        operationSequence[0].Should().Be("Validation");
+        operationSequence[1].Should().Be("Mapping");
+
+        _validatorMock.Verify(v => v.ValidateAsync(userViewModel, CancellationToken.None), Times.Once);
+        _mapperMock.Verify(m => m.Map<User>(userViewModel), Times.Once);
+    }
+
     [Fact]
     public async Task Create_WhenNewUserCreated_UserShouldBePresentInDataContext()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var newUser = new User
+        // Arrange
+        var userViewModel = new UserInputViewModel
         {
             Forename = "New",
             Surname = "User",
@@ -24,26 +92,100 @@ public class UserServiceTests
             IsActive = true
         };
 
-        var service = new UserService(context);
+        var user = new User
+        {
+            Forename = "New",
+            Surname = "User",
+            Email = "newuser@gmail.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
 
-        //Act
-        await service.Create(newUser);
+        _mapperMock.Setup(m => m.Map<User>(userViewModel)).Returns(user);
 
-        //Assert
-        var users = await service.GetAll();
+        // Act
+        var result = await _service.Create(userViewModel);
 
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+
+        var users = await _context.Users.ToListAsync();
         users.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(newUser);
+            .Which.Should().BeEquivalentTo(user);
+    }
+
+    [Fact]
+    public async Task Create_WhenValidationFails_ShouldReturnErrors()
+    {
+        // Arrange
+        var invalidUser = new UserInputViewModel
+        {
+            // Missing required fields
+            Email = "invalid-email"  // Invalid email format
+        };
+
+        var validationFailures = new[]
+        {
+            new ValidationFailure("Forename", "Forename is required"),
+            new ValidationFailure("Surname", "Surname is required"),
+            new ValidationFailure("Email", "Invalid email format")
+        };
+
+        var validationResult = new ValidationResult(validationFailures);
+
+        _validatorMock.Setup(v => v.ValidateAsync(invalidUser, CancellationToken.None))
+            .ReturnsAsync(validationResult);
+
+        // Act
+        var result = await _service.Create(invalidUser);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().HaveCount(3);
+        result.Errors.Should().Contain(["Forename is required", "Surname is required", "Invalid email format"]);
+
+        // Verify that Create was never called on the data context
+        var users = await _context.Users.ToListAsync();
+        users.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidDateOfBirth_ShouldFailValidation()
+    {
+        // Arrange
+        var futureDate = DateOnly.FromDateTime(DateTime.Today.AddYears(1));
+        var userWithFutureDate = new UserInputViewModel
+        {
+            Forename = "Future",
+            Surname = "User",
+            Email = "future@example.com",
+            DateOfBirth = futureDate,
+            IsActive = true
+        };
+
+        var validationFailure = new ValidationFailure("DateOfBirth", "Date of birth cannot be in the future");
+        var validationResult = new ValidationResult([validationFailure]);
+
+        _validatorMock.Setup(v => v.ValidateAsync(userWithFutureDate, CancellationToken.None))
+            .ReturnsAsync(validationResult);
+
+        // Act
+        var result = await _service.Create(userWithFutureDate);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be("Date of birth cannot be in the future");
     }
 
     [Fact]
     public async Task DeleteById_WhenUserExists_UserShouldNotBePresentInDataContext()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var userToBeDeleted = new User
+        // Arrange
+        var user = new User
         {
-            Id = -2,
+            Id = 1,
             Forename = "New",
             Surname = "User",
             Email = "newuser@gmail.com",
@@ -51,208 +193,458 @@ public class UserServiceTests
             IsActive = true
         };
 
-        var service = new UserService(context);
-        await service.Create(userToBeDeleted);
-
-        //Act
-        await service.DeleteById(userToBeDeleted.Id);
-
-        //Assert
-        var updatedUser = await service.GetById(userToBeDeleted.Id);
-        updatedUser.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Delete_WhenUserDoesNotExist_ShouldThrowException()
-    {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var service = new UserService(context);
-
-        //Act & Assert
-        await service.Invoking(s => s.DeleteById(int.MaxValue))
-            .Should().ThrowAsync<Exception>();
-    }
-
-    [Fact]
-    public async Task FilterByActive_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
-    {
-        // Arrange
-        var context = CreateInMemoryContext();
-        await SeedUsers(context,
-            new User
-            {
-                Forename = "Active",
-                Surname = "User",
-                Email = "active@example.com",
-                DateOfBirth = new DateOnly(1972, 12, 28),
-                IsActive = true
-            },
-            new User
-            {
-                Forename = "Inactive",
-                Surname = "User",
-                Email = "inactive@example.com",
-                DateOfBirth = new DateOnly(1972, 12, 28),
-                IsActive = false
-            });
-        var service = new UserService(context);
+        await _context.Create(user);
 
         // Act
-        var result = await service.FilterByActive(true);
+        var result = await _service.DeleteById(user.Id);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+
+        var deletedUser = await _context.GetById<User>(user.Id);
+        deletedUser.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteById_WhenUserDoesNotExist_ShouldReturnError()
+    {
+        // Arrange
+        const long nonExistentUserId = long.MaxValue;
+
+        // Act
+        var result = await _service.DeleteById(nonExistentUserId);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().Contain("User not found");
+    }
+
+    [Fact]
+    public async Task GetById_VerifyMapperIsCalledWithCorrectUser()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = 1,
+            Forename = "Test",
+            Surname = "User",
+            Email = "test@example.com",
+            DateOfBirth = new DateOnly(1980, 1, 1),
+            IsActive = true
+        };
+
+        await SeedUsers(_context, user);
+
+        var userViewModel = new UserViewModel
+        {
+            Id = 1,
+            Forename = "Test",
+            Surname = "User",
+            Email = "test@example.com",
+            DateOfBirth = new DateOnly(1980, 1, 1),
+            IsActive = true
+        };
+
+        _mapperMock.Setup(m => m.Map<UserViewModel>(It.IsAny<User>()))
+            .Returns(userViewModel);
+
+        // Act
+        await _service.GetById(1);
+
+        // Assert
+        _mapperMock.Verify(m => m.Map<UserViewModel>(It.Is<User>(u => u.Id == 1)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Get_VerifyMapperIsCalledForEachUser()
+    {
+        // Arrange
+        var users = new[]
+        {
+            new User { Id = 1, Forename = "User1", Surname = "Test", Email = "user1@example.com", DateOfBirth = new DateOnly(1980, 1, 1), IsActive = true },
+            new User { Id = 2, Forename = "User2", Surname = "Test", Email = "user2@example.com", DateOfBirth = new DateOnly(1985, 5, 5), IsActive = true }
+        };
+
+        await SeedUsers(_context, users);
+
+        var mapperCallCount = 0;
+
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(It.IsAny<User>()))
+            .Returns<User>(u => {
+                mapperCallCount++;
+                return new UserListItemViewModel
+                {
+                    Id = u.Id,
+                    Forename = u.Forename,
+                    Surname = u.Surname,
+                    Email = u.Email,
+                    IsActive = u.IsActive
+                };
+            });
+
+        // Act
+        var result = await _service.Get();
+
+        // Assert
+        var resultList = result.ToList();
+
+        mapperCallCount.Should().Be(2);
+
+        resultList.Should().HaveCount(2);
+        resultList.Should().Contain(vm => vm.Id == 1 && vm.Forename == "User1");
+        resultList.Should().Contain(vm => vm.Id == 2 && vm.Forename == "User2");
+    }
+
+    [Fact]
+    public async Task Get_WithComplexFilter_ShouldApplyAllCriteria()
+    {
+        // Arrange
+        // This test anticipates future filter expansion
+        var users = new[]
+        {
+            new User { Id = 1, Forename = "Ben", Surname = "Active", Email = "ben@example.com", DateOfBirth = new DateOnly(1980, 1, 1), IsActive = true },
+            new User { Id = 2, Forename = "Barbra", Surname = "Active", Email = "barbra@example.com", DateOfBirth = new DateOnly(1985, 5, 5), IsActive = true },
+            new User { Id = 3, Forename = "Harry", Surname = "Inactive", Email = "harry@example.com", DateOfBirth = new DateOnly(1990, 10, 10), IsActive = false }
+        };
+
+        await SeedUsers(_context, users);
+
+        var activeUserViewModels = new[]
+        {
+            new UserListItemViewModel { Id = 1, Forename = "Ben", Surname = "Active", Email = "ben@example.com", IsActive = true },
+            new UserListItemViewModel { Id = 2, Forename = "Barbra", Surname = "Active", Email = "barbra@example.com", IsActive = true }
+        };
+
+        // Set up mapping for all active users
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(It.Is<User>(u => u.IsActive)))
+            .Returns<User>(u => new UserListItemViewModel
+            {
+                Id = u.Id,
+                Forename = u.Forename,
+                Surname = u.Surname,
+                Email = u.Email,
+                IsActive = u.IsActive
+            });
+
+        // Using existing filter with ActiveStatus
+        var filter = new UserFilter { ActiveStatus = true };
+
+        // Act
+        var result = await _service.Get(filter);
+
+        // Assert
+        // Currently only testing Active Status but demonstrates how to test when if the filter gets more complex
+        result.Should().HaveCount(2);
+        result.Should().Contain(viewModel => viewModel.Id == 1);
+        result.Should().Contain(viewModel => viewModel.Id == 2);
+        result.Should().NotContain(viewModel => viewModel.Id == 3);
+    }
+
+    [Fact]
+    public async Task Get_WhenFilteringForActiveUsers_MustReturnOnlyActiveUsers()
+    {
+        // Arrange
+        var activeUser = new User
+        {
+            Id = 1,
+            Forename = "Active",
+            Surname = "User",
+            Email = "active@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = true
+        };
+
+        var inactiveUser = new User
+        {
+            Id = 2,
+            Forename = "Inactive",
+            Surname = "User",
+            Email = "inactive@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = false
+        };
+
+        await SeedUsers(_context, activeUser, inactiveUser);
+
+        var activeUserViewModel = new UserListItemViewModel
+        {
+            Id = 1,
+            Forename = "Active",
+            Surname = "User",
+            Email = "active@example.com",
+            IsActive = true
+        };
+
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(activeUser))
+            .Returns(activeUserViewModel);
+
+        // Act
+        var result = await _service.Get(new UserFilter { ActiveStatus = true });
 
         // Assert
         result.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new { Forename = "Active", IsActive = true });
+            .Which.Should().BeEquivalentTo(activeUserViewModel);
     }
 
     [Fact]
-    public async Task FilterByActive_WhenFilteringForInactiveUsers_MustReturnOnlyInactiveUsers()
+    public async Task Get_WhenFilteringForInactiveUsers_MustReturnOnlyInactiveUsers()
     {
         // Arrange
-        var context = CreateInMemoryContext();
-        await SeedUsers(context,
-            new User
-            {
-                Forename = "Active",
-                Surname = "User",
-                Email = "active@example.com",
-                DateOfBirth = new DateOnly(1972, 12, 28),
-                IsActive = true
-            },
-            new User
-            {
-                Forename = "Inactive",
-                Surname = "User",
-                Email = "inactive@example.com",
-                DateOfBirth = new DateOnly(1972, 12, 28),
-                IsActive = false
-            });
-        var service =  new UserService(context);
+        var activeUser = new User
+        {
+            Id = 1,
+            Forename = "Active",
+            Surname = "User",
+            Email = "active@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = true
+        };
+
+        var inactiveUser = new User
+        {
+            Id = 2,
+            Forename = "Inactive",
+            Surname = "User",
+            Email = "inactive@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = false
+        };
+
+        await SeedUsers(_context, activeUser, inactiveUser);
+
+        var inactiveUserViewModel = new UserListItemViewModel
+        {
+            Id = 2,
+            Forename = "Inactive",
+            Surname = "User",
+            Email = "inactive@example.com",
+            IsActive = false
+        };
+
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(inactiveUser))
+            .Returns(inactiveUserViewModel);
 
         // Act
-        var result = await service.FilterByActive(false);
+        var result = await _service.Get(new UserFilter { ActiveStatus = false });
 
         // Assert
         result.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new { Forename = "Inactive", IsActive = false });
+            .Which.Should().BeEquivalentTo(inactiveUserViewModel);
     }
 
     [Fact]
-    public async Task FilterByActive_WhenNoUsersMatchFilter_MustReturnEmptyCollection()
+    public async Task Get_WhenNoUsersMatchFilter_MustReturnEmptyCollection()
     {
         // Arrange
-        var context = CreateInMemoryContext();
-        await SeedUsers(context,
-            new User
-            {
-                Forename = "Active",
-                Surname = "User",
-                Email = "active@example.com",
-                DateOfBirth = new DateOnly(1972, 12, 28),
-                IsActive = true
-            });
-        var service = new UserService(context);
+        var activeUser = new User
+        {
+            Id = 1,
+            Forename = "Active",
+            Surname = "User",
+            Email = "active@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = true
+        };
+
+        await SeedUsers(_context, activeUser);
 
         // Act
-        var result = await service.FilterByActive(false);
+        var result = await _service.Get(new UserFilter { ActiveStatus = false });
 
         // Assert
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetAll_WhenContextReturnsEntities_MustReturnSameEntities()
+    public async Task Get_WhenNoFilterIsProvided_MustReturnFullCollection()
     {
-        // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.
-        var context = CreateInMemoryContext();
-        var user = new User { Forename = "Johnny", Surname = "User", Email = "juser@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
-        await SeedUsers(context, user);
+        // Arrange
+        var users = new[]
+        {
+            new User { Id = 1, Forename = "Active", Surname = "User", Email = "active@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true },
+            new User { Id = 2, Forename = "Inactive", Surname = "User", Email = "inactive@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = false }
+        };
 
-        var service = new UserService(context);
+        await SeedUsers(_context, users);
 
-        // Act: Invokes the method under test with the arranged parameters.
-        var result = await service.GetAll();
+        var userViewModels = new[]
+        {
+            new UserListItemViewModel { Id = 1, Forename = "Active", Surname = "User", Email = "active@example.com", IsActive = true },
+            new UserListItemViewModel { Id = 2, Forename = "Inactive", Surname = "User", Email = "inactive@example.com", IsActive = false }
+        };
 
-        // Assert: Verifies that the action of the method under test behaves as expected.
-        result.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(user);
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(users[0])).Returns(userViewModels[0]);
+        _mapperMock.Setup(m => m.Map<UserListItemViewModel>(users[1])).Returns(userViewModels[1]);
+
+        // Act
+        var result = await _service.Get();
+
+        // Assert
+        result.Should().HaveCount(2)
+            .And.BeEquivalentTo(userViewModels);
     }
 
     [Fact]
     public async Task GetById_WhenEntityExists_ShouldReturnCorrespondingEntity()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var user = new User { Id = -2, Forename = "Johnny", Surname = "User", Email = "juser@example.com", DateOfBirth = new DateOnly(1972, 12, 28), IsActive = true };
-        await SeedUsers(context, user);
+        // Arrange
+        var user = new User
+        {
+            Id = 1,
+            Forename = "Johnny",
+            Surname = "User",
+            Email = "juser@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = true
+        };
 
-        var service = new UserService(context);
+        await SeedUsers(_context, user);
 
-        //Act
-        var result = await service.GetById(-2);
+        var userViewModel = new UserViewModel
+        {
+            Id = 1,
+            Forename = "Johnny",
+            Surname = "User",
+            Email = "juser@example.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = true
+        };
 
-        //Assert
-        result.Should().BeEquivalentTo(user);
+        _mapperMock.Setup(m => m.Map<UserViewModel>(user))
+            .Returns(userViewModel);
+
+        // Act
+        var result = await _service.GetById(1);
+
+        // Assert
+        result.Found.Should().BeTrue();
+        result.User.Should().BeEquivalentTo(userViewModel);
     }
 
     [Fact]
-    public async Task GetById_WhenEntityDoesNotExist_ShouldReturnNull()
+    public async Task GetById_WhenEntityDoesNotExist_ShouldReturnNotFound()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var service = new UserService(context);
+        // Arrange
+        // Act
+        var result = await _service.GetById(1);
 
-        //Act
-        var result = await service.GetById(1);
-
-        //Assert
-        result.Should().BeNull();
+        // Assert
+        result.Found.Should().BeFalse();
+        result.User.Should().BeNull();
     }
 
     [Fact]
     public async Task Update_WhenUserExists_UserShouldBeUpdatedWithNewValues()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var newUser = new User
+        // Arrange
+        var existingUser = new User
         {
-            Id = -2,
-            Forename = "New",
+            Id = 1,
+            Forename = "Old",
             Surname = "User",
-            Email = "newuser@gmail.com",
+            Email = "old@example.com",
             DateOfBirth = new DateOnly(1962, 5, 23),
             IsActive = true
         };
 
-        var service = new UserService(context);
-        await service.Create(newUser);
+        await _context.Create(existingUser);
 
-        var userToUpdate = await service.GetById(newUser.Id);
-        userToUpdate!.Forename = "Updated";
-        userToUpdate.Surname = "Also";
-        userToUpdate.Email = "updated@email.com";
-        userToUpdate.DateOfBirth = new DateOnly(1972, 12, 28);
-        userToUpdate.IsActive = false;
+        var updatedUserViewModel = new UserInputViewModel
+        {
+            Id = 1,
+            Forename = "Updated",
+            Surname = "Also",
+            Email = "updated@email.com",
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = false
+        };
 
-        //Act
-        await service.Update(userToUpdate);
+        var updatedUser = await _context.GetById<User>(1);
+        updatedUser!.Forename = "Updated";
+        updatedUser.Surname = "Also";
+        updatedUser.Email = "updated@email.com";
+        updatedUser.DateOfBirth = new DateOnly(1972, 12, 28);
+        updatedUser.IsActive = false;
 
-        //Assert
-        var updatedUser = await service.GetById(newUser.Id);
-        updatedUser.Should().BeEquivalentTo(userToUpdate);
+        _mapperMock.Setup(m => m.Map<User>(updatedUserViewModel))
+            .Returns(updatedUser);
+
+        // Act
+        var result = await _service.Update(updatedUserViewModel);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+
+        var userInDb = await _context.GetById<User>(1);
+        userInDb.Should().NotBeNull();
+        userInDb.Should().BeEquivalentTo(updatedUser);
     }
 
     [Fact]
-    public async Task Update_WhenUserDoesNotExist_ShouldThrowException()
+    public async Task Update_WhenUserDoesNotExist_ShouldStillValidate()
     {
-        //Arrange
-        var context = CreateInMemoryContext();
-        var service = new UserService(context);
+        // Arrange
+        var nonExistentUser = new UserInputViewModel
+        {
+            Id = 999,
+            // Missing required fields
+        };
 
-        //Act & Assert
-        await service.Invoking(s => s.Update(new User { Id = 53, Email = "non.existant@email.com" }))
-            .Should().ThrowAsync<Exception>();
+        var validationFailures = new[]
+        {
+            new ValidationFailure("Forename", "Forename is required"),
+            new ValidationFailure("Surname", "Surname is required"),
+            new ValidationFailure("Email", "Email is required")
+        };
+
+        var validationResult = new ValidationResult(validationFailures);
+
+        _validatorMock.Setup(v => v.ValidateAsync(nonExistentUser, CancellationToken.None))
+            .ReturnsAsync(validationResult);
+
+        // Act
+        var result = await _service.Update(nonExistentUser);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().HaveCount(3);
+
+        // Verify that validation was called before any data access attempt
+        _validatorMock.Verify(v => v.ValidateAsync(nonExistentUser, CancellationToken.None), Times.Once);
+
+        // The mapper and data context should not be called if validation fails
+        _mapperMock.Verify(m => m.Map<User>(It.IsAny<UserInputViewModel>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_WhenValidationFails_ShouldReturnErrors()
+    {
+        // Arrange
+        var validationFailure = new ValidationFailure("Email", "Email is required");
+        var validationResult = new ValidationResult([validationFailure]);
+
+        var userViewModel = new UserInputViewModel
+        {
+            Id = 1,
+            Forename = "Updated",
+            Surname = "Also",
+            // Missing email
+            DateOfBirth = new DateOnly(1972, 12, 28),
+            IsActive = false
+        };
+
+        _validatorMock.Setup(v => v.ValidateAsync(userViewModel, CancellationToken.None))
+            .ReturnsAsync(validationResult);
+
+        // Act
+        var result = await _service.Update(userViewModel);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Be("Email is required");
     }
 
     private TestDataContext CreateInMemoryContext()

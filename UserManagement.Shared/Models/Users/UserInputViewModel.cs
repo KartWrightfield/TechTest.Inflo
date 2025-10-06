@@ -1,7 +1,6 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace UserManagement.Web.Models.Users;
+namespace UserManagement.Shared.Models.Users;
 
 public class UserInputViewModel
 {

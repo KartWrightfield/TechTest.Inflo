@@ -1,8 +1,11 @@
-﻿using System;
+﻿namespace UserManagement.Shared.Models.Users;
 
-namespace UserManagement.Web.Models.Users;
+public class UserListViewModel
+{
+    public List<UserListItemViewModel> Items { get; set; } = new();
+}
 
-public class UserViewModel
+public class UserListItemViewModel
 {
     public long Id { get; set; }
     public string? Forename { get; set; }
@@ -10,6 +13,4 @@ public class UserViewModel
     public string? Email { get; set; }
     public DateOnly? DateOfBirth { get; set; }
     public bool IsActive { get; set; }
-
-    public string FullName => $"{Forename} {Surname}";
 }

@@ -1,97 +1,77 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
-using UserManagement.Data.Entities;
+using AutoMapper;
 using UserManagement.Services.Interfaces;
-using UserManagement.Web.Models.Users;
+using UserManagement.Shared.Filters;
+using UserManagement.Shared.Models.Users;
 
 namespace UserManagement.Web.Controllers;
 
 [Route("users")]
-public class UsersController(IUserService userService) : Controller
+public class UsersController(
+    IUserService userService,
+    IMapper mapper)
+    : Controller
 {
-    [HttpGet("add")]
-    public IActionResult Add()
+    [HttpGet("create")]
+    public IActionResult Create()
     {
         return View(new UserInputViewModel());
     }
 
-    [HttpPost("add")]
-    public async Task<IActionResult> Add(UserInputViewModel userInputViewModel)
+    [HttpPost("create")]
+    public async Task<IActionResult> Create(UserInputViewModel viewModel)
     {
         if (!ModelState.IsValid)
         {
-            return View(userInputViewModel);
+            return View(viewModel);
         }
 
-        if (userInputViewModel.Forename == null ||
-            userInputViewModel.Surname == null ||
-            userInputViewModel.Email == null ||
-            userInputViewModel.DateOfBirth == null)
+        var (isSuccess, errors) = await userService.Create(viewModel);
+
+        if (isSuccess)
         {
-            ModelState.AddModelError(string.Empty, "All required fields must be provided");
-            return View(userInputViewModel);
-        }
-
-        try
-        {
-            var user = new User
-            {
-                Forename = userInputViewModel.Forename,
-                Surname = userInputViewModel.Surname,
-                Email = userInputViewModel.Email,
-                DateOfBirth = (DateOnly)userInputViewModel.DateOfBirth,
-                IsActive = userInputViewModel.IsActive,
-            };
-
-            await userService.Create(user);
-
-            TempData["SuccessMessage"] = $"User {user.Forename} {user.Surname} was created successfully";
-
+            TempData["SuccessMessage"] = $"User {viewModel.Forename} {viewModel.Surname} was created successfully";
             return RedirectToAction(nameof(List));
         }
-        catch (Exception ex)
+
+        foreach (var error in errors)
         {
-            ModelState.AddModelError(string.Empty, $"Failed to create user: {ex.Message}");
-            return View(userInputViewModel);
+            ModelState.AddModelError(string.Empty, error);
         }
+
+        return View(viewModel);
     }
 
     [HttpGet("delete")]
     public async Task<IActionResult> Delete(int userId)
     {
-        var user = await userService.GetById(userId);
+        var (found, userViewModel) = await userService.GetById(userId);
 
-        if (user == null)
+        if (found)
         {
-            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
-            return RedirectToAction(nameof(List));
+            return View(userViewModel);
         }
 
-        var userViewModel = new UserViewModel
-        {
-            Id = user.Id,
-            Forename = user.Forename,
-            Surname = user.Surname,
-            Email = user.Email,
-            DateOfBirth = user.DateOfBirth,
-            IsActive = user.IsActive
-        };
-
-        return View(userViewModel);
+        TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+        return RedirectToAction(nameof(List));
     }
 
     [HttpPost("delete")]
     public async Task<IActionResult> DeleteConfirmed(int userId)
     {
-        try
+        var (isSuccess, errors) = await userService.DeleteById(userId);
+
+        if (isSuccess)
         {
-            await userService.DeleteById(userId);
             TempData["SuccessMessage"] = "User deleted successfully";
         }
-        catch (Exception ex)
+        else
         {
-            ModelState.AddModelError(string.Empty, $"Failed to delete user: {ex.Message}");
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError(string.Empty, error);
+            }
             TempData["ErrorMessage"] = $"Failed to delete user with ID: {userId}";
         }
 
@@ -101,26 +81,12 @@ public class UsersController(IUserService userService) : Controller
     [HttpGet]
     public async Task<ViewResult> List(string filter = "all")
     {
-        IEnumerable<User> users = filter.ToLower() switch
-        {
-            "active" => await userService.FilterByActive(true),
-            "inactive" => await userService.FilterByActive(false),
-            _ => await userService.GetAll()
-        };
-
-        var items = users.Select(p => new UserListItemViewModel
-        {
-            Id = p.Id,
-            Forename = p.Forename,
-            Surname = p.Surname,
-            Email = p.Email,
-            DateOfBirth = p.DateOfBirth,
-            IsActive = p.IsActive
-        });
+        var userFilter = UserFilter.FromString(filter);
+        var users = await userService.Get(userFilter);
 
         var model = new UserListViewModel
         {
-            Items = items.ToList()
+            Items = users.ToList()
         };
 
         return View(model);
@@ -129,90 +95,53 @@ public class UsersController(IUserService userService) : Controller
     [HttpGet("update")]
     public async Task<IActionResult> Update(int userId)
     {
-        var user = await userService.GetById(userId);
+        var (found, userViewModel) = await userService.GetById(userId);
 
-        if (user == null)
+        if (found)
         {
-            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
-            return RedirectToAction(nameof(List));
+            var userInputViewModel = mapper.Map<UserInputViewModel>(userViewModel);
+            return View(userInputViewModel);
         }
 
-        var userInputViewModel = new UserInputViewModel
-        {
-            Id = user.Id,
-            Forename = user.Forename,
-            Surname = user.Surname,
-            Email = user.Email,
-            DateOfBirth = user.DateOfBirth,
-            IsActive = user.IsActive
-        };
-
-        return View(userInputViewModel);
+        TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+        return RedirectToAction(nameof(List));
     }
 
     [HttpPost("update")]
-    public async Task<IActionResult> Update(UserInputViewModel userInputViewModel)
+    public async Task<IActionResult> Update(UserInputViewModel viewModel)
     {
         if (!ModelState.IsValid)
         {
-            return View(userInputViewModel);
+            return View(viewModel);
         }
 
-        if (userInputViewModel.Forename == null ||
-            userInputViewModel.Surname == null ||
-            userInputViewModel.Email == null ||
-            userInputViewModel.DateOfBirth == null)
+        var (isSuccess, errors) = await userService.Update(viewModel);
+
+        if (isSuccess)
         {
-            ModelState.AddModelError(string.Empty, "All required fields must be provided");
-            return View(userInputViewModel);
-        }
-
-        try
-        {
-            var user = new User
-            {
-                Id = userInputViewModel.Id,
-                Forename = userInputViewModel.Forename,
-                Surname = userInputViewModel.Surname,
-                Email = userInputViewModel.Email,
-                DateOfBirth = (DateOnly)userInputViewModel.DateOfBirth,
-                IsActive = userInputViewModel.IsActive,
-            };
-
-            await userService.Update(user);
-
-            TempData["SuccessMessage"] = $"User {user.Forename} {user.Surname} was updated successfully";
-
+            TempData["SuccessMessage"] = $"User {viewModel.Forename} {viewModel.Surname} was updated successfully";
             return RedirectToAction(nameof(List));
         }
-        catch (Exception ex)
+
+        foreach (var error in errors)
         {
-            ModelState.AddModelError(string.Empty, $"Failed to update user: {ex.Message}");
-            return View(userInputViewModel);
+            ModelState.AddModelError(string.Empty, error);
         }
+
+        return View(viewModel);
     }
 
     [HttpGet("view")]
     public async Task<IActionResult> View(int userId)
     {
-        var user = await userService.GetById(userId);
+        var (found, userViewModel) = await userService.GetById(userId);
 
-        if (user == null)
+        if (found)
         {
-            TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
-            return RedirectToAction(nameof(List));
+            return View(userViewModel);
         }
 
-        var userViewModel = new UserViewModel
-        {
-            Id = user.Id,
-            Forename = user.Forename,
-            Surname = user.Surname,
-            Email = user.Email,
-            DateOfBirth = user.DateOfBirth,
-            IsActive = user.IsActive
-        };
-
-        return View(userViewModel);
+        TempData["ErrorMessage"] = $"Unable to find user with ID {userId}";
+        return RedirectToAction(nameof(List));
     }
 }

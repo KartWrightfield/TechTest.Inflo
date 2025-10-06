@@ -1,10 +1,10 @@
-﻿@model UserManagement.Web.Models.Users.UserInputViewModel
+﻿@model UserManagement.Shared.Models.Users.UserInputViewModel
 
 <h2>Create User</h2>
 
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-<form asp-action="Add" method="post">
+<form asp-action="Create" method="post">
     <div class="form-group">
         <label asp-for="Forename">Forename</label>
         <input asp-for="Forename" class="form-control" />
