@@ -119,7 +119,11 @@ public class UserService(
             changes.Add($"Email changed from '{userEntity.Email}' to '{viewModel.Email}'");
 
         if (userEntity.DateOfBirth != viewModel.DateOfBirth)
-            changes.Add($"Date of Birth changed from '{userEntity.DateOfBirth}' to '{viewModel.DateOfBirth}'");
+        {
+            var originalDateString = userEntity.DateOfBirth.ToString("dd/MM/yyyy");
+            var newDateString = viewModel.DateOfBirth?.ToString("dd/MM/yyyy");
+            changes.Add($"Date of Birth changed from '{originalDateString}' to '{newDateString}'");
+        }
 
         if (userEntity.IsActive != viewModel.IsActive)
             changes.Add($"Active status changed from '{userEntity.IsActive}' to '{viewModel.IsActive}'");
