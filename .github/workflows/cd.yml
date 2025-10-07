@@ -1,0 +1,73 @@
+name: Continuous Deployment
+
+on:
+  # Only run CD after successful CI on main branch
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    branches: [main]
+    types:
+      - completed
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  deployment-simulation:
+    # Only run if the CI workflow was successful
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+            const matchArtifact = artifacts.data.artifacts.find(artifact => artifact.name === "app-build");
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip'
+            });
+            const fs = require('fs');
+            fs.writeFileSync('app-build.zip', Buffer.from(download.data));
+      
+      - name: Unzip artifact
+        run: unzip app-build.zip -d app
+          
+      - name: Display deployment plan
+        run: |
+          echo "===== DEPLOYMENT PLAN ====="
+          echo "1. Simulate infrastructure validation"
+          echo "2. Simulate deployment to development environment"
+          echo "3. Run post-deployment checks"
+          
+      - name: Simulate deployment to environment
+        run: |
+          echo "Application would be deployed to: https://myapp-dev.example.com"
+          
+      - name: Generate deployment report
+        run: |
+          cat > deployment-summary.md << EOF
+          # Deployment Summary
+          
+          ## Environment
+          - Name: Development
+          - URL: https://myapp-dev.example.com (simulated)
+          
+          ## Deployment Details
+          - Version: $(date +%Y.%m.%d.%H%M)
+          - Deployment Time: $(date)
+          - Status: ✅ Success (Simulated)
+          EOF
+          
+      - name: Upload deployment report
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-summary
+          path: deployment-summary.md
