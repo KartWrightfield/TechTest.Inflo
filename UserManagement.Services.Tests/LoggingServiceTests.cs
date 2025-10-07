@@ -936,8 +936,8 @@ public class LoggingServiceTests
     {
         public DbSet<Log> Logs { get; set; }
 
-        public IQueryable<TEntity> GetAll<TEntity>() where TEntity : class
-            => base.Set<TEntity>();
+        public Task<IQueryable<TEntity>> GetAll<TEntity>() where TEntity : class
+            => Task.FromResult<IQueryable<TEntity>>(Set<TEntity>());
 
         public async Task<TEntity?> GetById<TEntity>(long id) where TEntity : class
         {

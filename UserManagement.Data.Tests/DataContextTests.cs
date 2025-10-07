@@ -24,7 +24,7 @@ public class DataContextTests
         await context.Create(newEntity);
 
         //Assert
-        var userSet = context.GetAll<User>();
+        var userSet = await context.GetAll<User>();
 
         userSet.AsEnumerable().Should().Contain(s => s.Email == newEntity.Email)
             .Which.Should().BeEquivalentTo(newEntity);
@@ -35,13 +35,13 @@ public class DataContextTests
     {
         //Arrange
         var context = CreateContext();
-        var entity = context.GetAll<User>().First();
+        var entity = (await context.GetAll<User>()).First();
 
         //Act
         await context.Delete(entity);
 
         //Assert
-        var userSet = context.GetAll<User>();
+        var userSet = await context.GetAll<User>();
         userSet.AsEnumerable().Should().NotContain(s => s.Email == entity.Email);
     }
 
@@ -61,7 +61,7 @@ public class DataContextTests
         await context.Create(entity);
 
         // Act: Invokes the method under test with the arranged parameters.
-        var result = context.GetAll<User>();
+        var result = await context.GetAll<User>();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
         result.AsEnumerable()
@@ -74,11 +74,11 @@ public class DataContextTests
     {
         // Arrange: Initialises objects and sets the value of the data that is passed to the method under test.
         var context = CreateContext();
-        var entity = context.GetAll<User>().First();
+        var entity = (await context.GetAll<User>()).First();
         await context.Delete(entity);
 
         // Act: Invokes the method under test with the arranged parameters.
-        var result = context.GetAll<User>();
+        var result = await context.GetAll<User>();
 
         // Assert: Verifies that the action of the method under test behaves as expected.
         result.AsEnumerable().Should().NotContain(s => s.Email == entity.Email);
@@ -141,7 +141,7 @@ public class DataContextTests
         await context.Update(entityToUpdate);
 
         //Assert
-        var userSet = context.GetAll<User>();
+        var userSet = await context.GetAll<User>();
 
         userSet.AsEnumerable().Should().Contain(s => s.Email == "new.email@notld.com")
             .Which.Id.Should().Be(newEntity.Id);

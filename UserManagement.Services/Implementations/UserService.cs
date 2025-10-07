@@ -69,7 +69,7 @@ public class UserService(
 
     private async Task<IEnumerable<User>> GetUsersWithFilter(UserFilter filter)
     {
-        var query = dataAccess.GetAll<User>();
+        var query = await dataAccess.GetAll<User>();
 
         if (filter.ActiveStatus.HasValue)
         {

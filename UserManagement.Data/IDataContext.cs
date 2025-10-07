@@ -14,7 +14,7 @@ public interface IDataContext
     /// </summary>
     /// <typeparam name="TEntity"></typeparam>
     /// <returns></returns>
-    IQueryable<TEntity> GetAll<TEntity>() where TEntity : class;
+    Task<IQueryable<TEntity>> GetAll<TEntity>() where TEntity : class;
 
     /// <summary>
     /// Get an item by its ID

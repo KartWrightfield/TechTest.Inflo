@@ -46,8 +46,8 @@ public sealed class DataContext : DbContext, IDataContext
     public DbSet<Log> Logs { get; set; }
     public DbSet<User>? Users { get; set; }
 
-    public IQueryable<TEntity> GetAll<TEntity>() where TEntity : class
-        => Set<TEntity>();
+    public Task<IQueryable<TEntity>> GetAll<TEntity>() where TEntity : class
+        => Task.FromResult<IQueryable<TEntity>>(Set<TEntity>());
 
     public async Task<TEntity?> GetById<TEntity>(long id) where TEntity : class
     {
