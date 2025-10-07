@@ -25,7 +25,26 @@ jobs:
           run: dotnet build --configuration Release --no-restore
           
         - name: Test
-          run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+          run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
           
-        - name: Upload coverate reports to Codecov
+        - name: Upload coverage reports to Codecov
           uses: codecov/codecov-action@v3
+          
+        - name: Generate test report
+          if: always()
+          uses: dorny/test-reporter@v1
+          with:
+            name: .NET Tests
+            path: '**/TestResults/*.trx'
+            reporter: dotnet-trx
+            
+        - name: Generate coverage report
+          run: |
+            dotnet tool install -g dotnet-reportgenerator-globaltool
+            reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coveragereport -reporttypes:Html
+            
+        - name: Upload coverage report
+          uses: actions/upload-artifact@v3
+          with:
+            name: CoverageReport
+            path: coveragereport
