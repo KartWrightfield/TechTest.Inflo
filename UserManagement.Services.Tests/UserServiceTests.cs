@@ -20,6 +20,7 @@ public class UserServiceTests
 {
     private readonly Mock<IValidator<UserInputViewModel>> _validatorMock;
     private readonly Mock<IMapper> _mapperMock;
+    private readonly Mock<ILoggingService> _loggingServiceMock;
     private readonly TestDataContext _context;
     private readonly IUserService _service;
 
@@ -28,11 +29,21 @@ public class UserServiceTests
         _context = CreateInMemoryContext();
         _validatorMock = new Mock<IValidator<UserInputViewModel>>();
         _mapperMock = new Mock<IMapper>();
+        _loggingServiceMock = new Mock<ILoggingService>();
 
         _validatorMock.Setup(v => v.ValidateAsync(It.IsAny<UserInputViewModel>(), CancellationToken.None))
             .ReturnsAsync(new ValidationResult());
 
-        _service = new UserService(_context, _validatorMock.Object, _mapperMock.Object);
+        _service = new UserService(_context, _validatorMock.Object, _mapperMock.Object, _loggingServiceMock.Object);
+    }
+
+    private TestDataContext CreateInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<TestDataContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        return new TestDataContext(options);
     }
 
     [Fact]
@@ -68,15 +79,36 @@ public class UserServiceTests
             .Callback(() => operationSequence.Add("Mapping"))
             .Returns(user);
 
+        _context.SetupCreateTracking(() => operationSequence.Add("Database"));
+
+        _loggingServiceMock.Setup(l => l.LogAction(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<string>(),
+                null))
+            .Callback(() => operationSequence.Add("Logging"))
+            .Returns(Task.CompletedTask);
+
         // Act
         await _service.Create(userViewModel);
 
         // Assert
+        operationSequence.Count.Should().Be(4);
         operationSequence[0].Should().Be("Validation");
         operationSequence[1].Should().Be("Mapping");
+        operationSequence[2].Should().Be("Database");
+        operationSequence[3].Should().Be("Logging");
 
         _validatorMock.Verify(v => v.ValidateAsync(userViewModel, CancellationToken.None), Times.Once);
         _mapperMock.Verify(m => m.Map<User>(userViewModel), Times.Once);
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Create",
+            "User",
+            user.Id,
+            $"Created user: {userViewModel.FullName}",
+            null
+        ), Times.Once);
     }
 
     [Fact]
@@ -113,6 +145,14 @@ public class UserServiceTests
         var users = await _context.Users.ToListAsync();
         users.Should().ContainSingle()
             .Which.Should().BeEquivalentTo(user);
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Create",
+            "User",
+            user.Id,
+            $"Created user: {userViewModel.FullName}",
+            null
+        ), Times.Once);
     }
 
     [Fact]
@@ -145,9 +185,17 @@ public class UserServiceTests
         result.Errors.Should().HaveCount(3);
         result.Errors.Should().Contain(["Forename is required", "Surname is required", "Invalid email format"]);
 
-        // Verify that Create was never called on the data context
+        // Verify that neither Create nor logAction was never called on the data context
         var users = await _context.Users.ToListAsync();
         users.Should().BeEmpty();
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<long>(),
+            It.IsAny<string>(),
+            null
+        ), Times.Never);
     }
 
     [Fact]
@@ -180,6 +228,54 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task DeleteById_EnsuresCorrectOrderOfOperations()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = 1,
+            Forename = "Test",
+            Surname = "User",
+            Email = "test@example.com",
+            DateOfBirth = new DateOnly(1980, 1, 1),
+            IsActive = true
+        };
+
+        await _context.Create(user);
+
+        // Using callback to track execution order
+        var operationSequence = new List<string>();
+
+        // Setup delete tracking
+        _context.SetupDeleteTracking(() => operationSequence.Add("Database"));
+
+        _loggingServiceMock.Setup(l => l.LogAction(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<string>(),
+                null))
+            .Callback(() => operationSequence.Add("Logging"))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.DeleteById(user.Id);
+
+        // Assert
+        operationSequence.Count.Should().Be(2);
+        operationSequence[0].Should().Be("Database");
+        operationSequence[1].Should().Be("Logging");
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Delete",
+            "User",
+            user.Id,
+            string.Empty,
+            null
+        ), Times.Once);
+    }
+
+    [Fact]
     public async Task DeleteById_WhenUserExists_UserShouldNotBePresentInDataContext()
     {
         // Arrange
@@ -204,6 +300,14 @@ public class UserServiceTests
 
         var deletedUser = await _context.GetById<User>(user.Id);
         deletedUser.Should().BeNull();
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Delete",
+            "User",
+            user.Id,
+            string.Empty,
+            null
+        ), Times.Once);
     }
 
     [Fact]
@@ -218,6 +322,14 @@ public class UserServiceTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Errors.Should().Contain("User not found");
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<long>(),
+            It.IsAny<string>(),
+            null
+        ), Times.Never);
     }
 
     [Fact]
@@ -535,6 +647,64 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task Update_EnsuresCorrectOrderOfOperations()
+    {
+        // Arrange
+        var existingUser = new User
+        {
+            Id = 1,
+            Forename = "Old",
+            Surname = "User",
+            Email = "old@example.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
+
+        await _context.Create(existingUser);
+
+        var updatedUserViewModel = new UserInputViewModel
+        {
+            Id = 1,
+            Forename = "Updated",
+            Surname = "User",
+            Email = "old@example.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
+
+        // Using callback to track execution order
+        var operationSequence = new List<string>();
+
+        _validatorMock.Setup(v => v.ValidateAsync(updatedUserViewModel, CancellationToken.None))
+            .Callback(() => operationSequence.Add("Validation"))
+            .ReturnsAsync(new ValidationResult());
+
+        _mapperMock.Setup(m => m.Map(updatedUserViewModel, existingUser))
+            .Callback(() => operationSequence.Add("Mapping"));
+
+        _context.SetupUpdateTracking(() => operationSequence.Add("Database"));
+
+        _loggingServiceMock.Setup(l => l.LogAction(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<string>(),
+                null))
+            .Callback(() => operationSequence.Add("Logging"))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.Update(updatedUserViewModel);
+
+        // Assert
+        operationSequence.Count.Should().Be(4);
+        operationSequence[0].Should().Be("Validation");
+        operationSequence[1].Should().Be("Mapping");
+        operationSequence[2].Should().Be("Database");
+        operationSequence[3].Should().Be("Logging");
+    }
+
+    [Fact]
     public async Task Update_WhenUserExists_UserShouldBeUpdatedWithNewValues()
     {
         // Arrange
@@ -560,15 +730,15 @@ public class UserServiceTests
             IsActive = false
         };
 
-        var updatedUser = await _context.GetById<User>(1);
-        updatedUser!.Forename = "Updated";
-        updatedUser.Surname = "Also";
-        updatedUser.Email = "updated@email.com";
-        updatedUser.DateOfBirth = new DateOnly(1972, 12, 28);
-        updatedUser.IsActive = false;
-
-        _mapperMock.Setup(m => m.Map<User>(updatedUserViewModel))
-            .Returns(updatedUser);
+        _mapperMock.Setup(m => m.Map(updatedUserViewModel, It.IsAny<User>()))
+            .Callback<UserInputViewModel, User>((vm, user) => {
+                // Manually update the user properties here
+                user.Forename = vm.Forename!;
+                user.Surname = vm.Surname!;
+                user.Email = vm.Email!;
+                user.DateOfBirth = (DateOnly)vm.DateOfBirth!;
+                user.IsActive = vm.IsActive;
+            });
 
         // Act
         var result = await _service.Update(updatedUserViewModel);
@@ -579,43 +749,55 @@ public class UserServiceTests
 
         var userInDb = await _context.GetById<User>(1);
         userInDb.Should().NotBeNull();
-        userInDb.Should().BeEquivalentTo(updatedUser);
+        userInDb!.Forename.Should().Be("Updated");
+        userInDb.Surname.Should().Be("Also");
+        userInDb.Email.Should().Be("updated@email.com");
+        userInDb.DateOfBirth.Should().Be(new DateOnly(1972, 12, 28));
+        userInDb.IsActive.Should().BeFalse();
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Update",
+            "User",
+            1,
+            It.Is<string>(s =>
+                s.Contains("Forename changed from 'Old' to 'Updated'") &&
+                s.Contains("Surname changed from 'User' to 'Also'") &&
+                s.Contains("Email changed from 'old@example.com' to 'updated@email.com'") &&
+                s.Contains("Date of Birth changed from '23/05/1962' to '28/12/1972'") &&
+                s.Contains("Active status changed from 'True' to 'False'")),
+            null
+        ), Times.Once);
     }
 
     [Fact]
-    public async Task Update_WhenUserDoesNotExist_ShouldStillValidate()
+    public async Task Update_WhenUserDoesNotExist_ShouldReturnErrorAndNotLog()
     {
         // Arrange
-        var nonExistentUser = new UserInputViewModel
+        var nonExistentUserViewModel = new UserInputViewModel
         {
             Id = 999,
-            // Missing required fields
+            Forename = "NonExistent",
+            Surname = "User",
+            Email = "nonexistent@example.com",
+            DateOfBirth = new DateOnly(1980, 1, 1),
+            IsActive = true
         };
-
-        var validationFailures = new[]
-        {
-            new ValidationFailure("Forename", "Forename is required"),
-            new ValidationFailure("Surname", "Surname is required"),
-            new ValidationFailure("Email", "Email is required")
-        };
-
-        var validationResult = new ValidationResult(validationFailures);
-
-        _validatorMock.Setup(v => v.ValidateAsync(nonExistentUser, CancellationToken.None))
-            .ReturnsAsync(validationResult);
 
         // Act
-        var result = await _service.Update(nonExistentUser);
+        var result = await _service.Update(nonExistentUserViewModel);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().HaveCount(3);
+        result.Errors.Should().Contain("User not found");
 
-        // Verify that validation was called before any data access attempt
-        _validatorMock.Verify(v => v.ValidateAsync(nonExistentUser, CancellationToken.None), Times.Once);
-
-        // The mapper and data context should not be called if validation fails
-        _mapperMock.Verify(m => m.Map<User>(It.IsAny<UserInputViewModel>()), Times.Never);
+        // Verify that logging was never called
+        _loggingServiceMock.Verify(l => l.LogAction(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<long>(),
+            It.IsAny<string>(),
+            null
+        ), Times.Never);
     }
 
     [Fact]
@@ -647,14 +829,50 @@ public class UserServiceTests
             .Which.Should().Be("Email is required");
     }
 
-    private TestDataContext CreateInMemoryContext()
+    [Fact]
+    public async Task Update_WithChangedProperties_LogsCorrectChanges()
     {
-        var options = new DbContextOptionsBuilder<TestDataContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
+        // Arrange
+        var existingUser = new User
+        {
+            Id = 1,
+            Forename = "Old",
+            Surname = "User",
+            Email = "old@example.com",
+            DateOfBirth = new DateOnly(1962, 5, 23),
+            IsActive = true
+        };
 
-        return new TestDataContext(options);
+        await _context.Create(existingUser);
+
+        var updatedUserViewModel = new UserInputViewModel
+        {
+            Id = 1,
+            Forename = "Updated", // Changed
+            Surname = "NewSurname", // Changed
+            Email = "old@example.com", // Unchanged
+            DateOfBirth = new DateOnly(1962, 5, 23), // Unchanged
+            IsActive = true // Unchanged
+        };
+
+        // Act
+        var result = await _service.Update(updatedUserViewModel);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        _loggingServiceMock.Verify(l => l.LogAction(
+            "Update",
+            "User",
+            1,
+            It.Is<string>(s =>
+                s.Contains("Forename changed from 'Old' to 'Updated'") &&
+                s.Contains("Surname changed from 'User' to 'NewSurname'")),
+            null
+        ), Times.Once);
     }
+
+
 
     private async Task SeedUsers(TestDataContext context, params User[] users)
     {
@@ -668,6 +886,11 @@ public class UserServiceTests
     // A simplified version of DataContext for testing
     public class TestDataContext(DbContextOptions<TestDataContext> options) : DbContext(options), IDataContext
     {
+        private Action? _createCallback;
+        private Action? _deleteCallback;
+        private Action? _updateCallback;
+
+        public DbSet<Log> Logs { get; set; }
         public DbSet<User> Users { get; set; }
 
         public IQueryable<TEntity> GetAll<TEntity>() where TEntity : class
@@ -680,6 +903,7 @@ public class UserServiceTests
 
         public async Task Create<TEntity>(TEntity entity) where TEntity : class
         {
+            _createCallback?.Invoke();
             base.Add(entity);
             await SaveChangesAsync();
         }
@@ -687,13 +911,32 @@ public class UserServiceTests
         public new async Task Update<TEntity>(TEntity entity) where TEntity : class
         {
             base.Update(entity);
+            _updateCallback?.Invoke();
             await SaveChangesAsync();
         }
 
         public async Task Delete<TEntity>(TEntity entity) where TEntity : class
         {
             base.Remove(entity);
+            _deleteCallback?.Invoke();
             await SaveChangesAsync();
+        }
+
+
+        // --- Test helper methods ---
+        public void SetupCreateTracking(Action callback)
+        {
+            _createCallback = callback;
+        }
+
+        public void SetupDeleteTracking(Action callback)
+        {
+            _deleteCallback = callback;
+        }
+
+        public void SetupUpdateTracking(Action callback)
+        {
+            _updateCallback = callback;
         }
     }
 }

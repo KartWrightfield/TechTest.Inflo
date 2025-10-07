@@ -1,0 +1,22 @@
+﻿@model UserManagement.Shared.Models.Logs.LogDetailViewModel
+
+<h2>Log Entry @Model.Id</h2>
+
+<div class="card">
+    <div class="card-body">
+        <p><strong>Id:</strong> @Model.Id</p>
+        <p><strong>Action:</strong> @Model.Action</p>
+        <p><strong>Entity Type:</strong> @Model.EntityType</p>
+        <p><strong>Entity Id:</strong> @Model.EntityId</p>
+        <p><strong>Details:</strong> @Model.Details</p>
+        <p><strong>Timestamp:</strong> @Model.FormattedTimestamp</p>
+    </div>
+</div>
+
+<div class="mt-3">
+    <div class="d-grid gap-2 d-md-flex justify-content-end">
+        <a asp-controller="Logs" asp-action="Index" class="btn btn-secondary">
+            Back to List
+        </a>
+    </div>
+</div>

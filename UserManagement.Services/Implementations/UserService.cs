@@ -16,7 +16,8 @@ namespace UserManagement.Services.Implementations;
 public class UserService(
     IDataContext dataAccess,
     IValidator<UserInputViewModel> userInputViewModelValidator,
-    IMapper mapper)
+    IMapper mapper,
+    ILoggingService loggingService)
     : IUserService
 {
     public async Task<(bool IsSuccess, IEnumerable<string> Errors)> Create(UserInputViewModel viewModel)
@@ -30,6 +31,13 @@ public class UserService(
         var user = mapper.Map<User>(viewModel);
         await dataAccess.Create(user);
 
+        await loggingService.LogAction(
+            action: "Create",
+            entityType: "User",
+            entityId: user.Id,
+            details: $"Created user: {viewModel.FullName}"
+        );
+
         return (true, []);
     }
 
@@ -42,6 +50,14 @@ public class UserService(
         }
 
         await dataAccess.Delete(user);
+
+        await loggingService.LogAction(
+            action: "Delete",
+            entityType: "User",
+            entityId: user.Id,
+            details: string.Empty
+        );
+
         return (true, []);
     }
 
@@ -66,9 +82,15 @@ public class UserService(
     public async Task<(bool Found, UserViewModel? User)> GetById(long id)
     {
         var user = await dataAccess.GetById<User>(id);
-        return user == null
-            ? (Found: false, User: null)
-            : (Found: true, User: mapper.Map<UserViewModel>(user));
+        if (user == null)
+        {
+            return (Found: false, User: null);
+        }
+
+        var userViewModel = mapper.Map<UserViewModel>(user);
+        userViewModel.Logs = await loggingService.GetLogsByEntity("User", id);
+
+        return (Found: true, User: userViewModel);
     }
 
     public async Task<(bool IsSuccess, IEnumerable<string> Errors)> Update(UserInputViewModel viewModel)
@@ -79,8 +101,42 @@ public class UserService(
             return (false, validationResult.Errors.Select(x => x.ErrorMessage));
         }
 
-        var user = mapper.Map<User>(viewModel);
-        await dataAccess.Update(user);
+        var userEntity = await dataAccess.GetById<User>(viewModel.Id);
+        if (userEntity == null)
+        {
+            return (false, ["User not found"]);
+        }
+
+        var changes = new List<string>();
+
+        if (userEntity.Forename != viewModel.Forename)
+            changes.Add($"Forename changed from '{userEntity.Forename}' to '{viewModel.Forename}'");
+
+        if (userEntity.Surname != viewModel.Surname)
+            changes.Add($"Surname changed from '{userEntity.Surname}' to '{viewModel.Surname}'");
+
+        if (userEntity.Email != viewModel.Email)
+            changes.Add($"Email changed from '{userEntity.Email}' to '{viewModel.Email}'");
+
+        if (userEntity.DateOfBirth != viewModel.DateOfBirth)
+            changes.Add($"Date of Birth changed from '{userEntity.DateOfBirth}' to '{viewModel.DateOfBirth}'");
+
+        if (userEntity.IsActive != viewModel.IsActive)
+            changes.Add($"Active status changed from '{userEntity.IsActive}' to '{viewModel.IsActive}'");
+
+        mapper.Map(viewModel, userEntity);
+        await dataAccess.Update(userEntity);
+
+        var detailsMessage = changes.Count != 0
+            ? $"Updated user: {string.Join(", ", changes)}"
+            : "User updated with no property changes";
+
+        await loggingService.LogAction(
+            action: "Update",
+            entityType: "User",
+            entityId: userEntity.Id,
+            details: detailsMessage
+        );
 
         return (true, []);
     }

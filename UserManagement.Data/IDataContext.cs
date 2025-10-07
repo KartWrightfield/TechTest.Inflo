@@ -1,10 +1,14 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using UserManagement.Data.Entities;
 
 namespace UserManagement.Data;
 
 public interface IDataContext
 {
+    DbSet<Log> Logs { get; set; }
+
     /// <summary>
     /// Get a list of items
     /// </summary>

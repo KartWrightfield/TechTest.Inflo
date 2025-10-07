@@ -4,9 +4,9 @@ using UserManagement.Shared.Models.Users;
 
 namespace UserManagement.Services.Mapping;
 
-public class MappingProfile : Profile
+public class UserMappingProfile : Profile
 {
-    public MappingProfile()
+    public UserMappingProfile()
     {
         CreateMap<UserInputViewModel, User>()
             .ForMember(dest => dest.DateOfBirth, opt =>

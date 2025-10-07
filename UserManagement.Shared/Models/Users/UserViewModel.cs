@@ -1,4 +1,6 @@
-﻿namespace UserManagement.Shared.Models.Users;
+﻿using UserManagement.Shared.Models.Logs;
+
+namespace UserManagement.Shared.Models.Users;
 
 public class UserViewModel
 {
@@ -10,4 +12,6 @@ public class UserViewModel
     public bool IsActive { get; set; }
 
     public string FullName => $"{Forename} {Surname}";
+
+    public IEnumerable<LogViewModel> Logs { get; set; } = new List<LogViewModel>();
 }

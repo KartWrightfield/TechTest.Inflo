@@ -11,8 +11,12 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddDomainServices(this IServiceCollection services)
     {
+        services.AddScoped<ILoggingService, LoggingService>();
         services.AddScoped<IUserService, UserService>();
-        services.AddAutoMapper(_ => { }, typeof(MappingProfile));
+
+        services.AddAutoMapper(_ => { }, typeof(LogMappingProfile));
+        services.AddAutoMapper(_ => { }, typeof(UserMappingProfile));
+
         services.AddValidatorsFromAssemblyContaining<UserInputViewModelValidator>();
 
         return services;
