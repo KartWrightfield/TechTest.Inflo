@@ -63,3 +63,45 @@ Add additional layers to the application that will ensure that it is scaleable w
 
 * Please feel free to change or refactor any code that has been supplied within the solution and think about clean maintainable code and architecture when extending the project.
 * If any additional packages, tools or setup are required to run your completed version, please document these thoroughly.
+
+---
+## George's Notes and Documentation
+
+Ultimately, I only managed to complete four of the six tasks in their entirety (#1, #2, #3, & #4). However, I did attempt the asynchronous operations task from section five and the CI/CD pipelines from section 6.
+
+### Additional Packages Used
+
+- AutoMapper 15.0.1
+  - https://www.nuget.org/packages/AutoMapper
+  - Used to make mapping between data entity objects and view models easy and tidy
+- FluentValidation 12.0.0
+  - https://www.nuget.org/packages/FluentValidation
+  - Used to make writing validation classes (i.e. `UserInputViewModelValidator`) easy, with very readable code
+- FluentValidation.DependencyInjectionExtensions 12.0.0
+  - https://www.nuget.org/packages/FluentValidation.DependencyInjectionExtensions
+  - Dependency injection extensions for the aforementioned FluentValidation package
+
+### CI/CD Pipelines
+The two workflow scripts can be found from the root of the repo in `.github/workflows`
+
+#### Continuous Integration
+- https://github.com/KartWrightfield/TechTest.Inflo/actions/workflows/ci.yml
+- The CI pipeline is triggered by a pull request or push to main
+- The pipeline builds the project, runs the tests and generates a test coverage report
+- The report can then be viewed either in codecov (POC only) or on GitHub itself (e.g. https://github.com/KartWrightfield/TechTest.Inflo/actions/runs/18338847795/job/52229197640)
+
+#### Continuous Deployment
+- https://github.com/KartWrightfield/TechTest.Inflo/actions/workflows/cd.yml
+- The CD pipeline is triggered by a successful execution of the CI pipeline
+- The pipeline builds the project (this could be improved later by having it re-use the same build executed in the CI stage), simulates deployment and then generates a deployment report
+
+### Final Notes and Observations
+
+- I focused my efforts on what felt like the foundational steps of the test, rather than try and attempt literally everything, I hope that wasn't a mistake!
+- Once those foundations were done, I picked the things from the fifth and sixth tasks which seemed most interesting to me (I've never written GitHub Actions before, but I'm glad to have had an excuse to do so!)
+- With the deadline approaching, these are the next improvements that I would be prioritising if I had more time:
+  1. Test coverage is focused more on the core classes (controllers/services). With the help of the CI coverage report, a more complete coverage can definitely be achieved
+  2. Validation on the Create/Edit forms is currently very rudimentary, it could definitely be improved with things like limiting input string length, or preventing birth dates older than 'X' years, etc.
+  3. The audit logging for user updates can be improved
+     - The log entry becomes hard to read if multiple properties are changed, as it's just a long string of 'X has changed from Y to Z' statements
+     - The comparison logic could be refactored into some kind of comparison helper or service that would be capable of logging changes even if the User class was extended to include more properties
